@@ -359,7 +359,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
             inicio,
             fin
           );
-          if (!totalResponse.success || !totalResponse.data) {
+          if (!totalResponse.success) {
             throw new Error(
               "Error al obtener el total de tickets del servidor"
             );
@@ -669,6 +669,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     try {
       // 1. Obtener tickets locales
       const localTickets = await ticketDb.getTickets();
+      console.log("Tickets locales obtenidos:", localTickets.length);
       const localTicketsMap = new Map(localTickets.map((t) => [t.uuid4, t]));
 
       // 2. Obtener tickets del servidor usando el rango de fechas del período
@@ -681,7 +682,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         fechaFin
       );
 
-      if (!totalResponse.success || !totalResponse.data) {
+      if (!totalResponse.success) {
         throw new Error("Error al obtener el total de tickets del servidor");
       }
 
@@ -790,8 +791,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
       for (const ticket of syncedTickets) {
         try {
-          const response = await ticketDb.deleteTicketByUuid(ticket.uuid4);
-          console.log("Ticket eliminado:", response);
+          await ticketDb.deleteTicketByUuid(ticket.uuid4);
+          console.log("Ticket eliminado:", ticket.uuid4);
         } catch (error) {
           // console.error("Error al eliminar ticket:", error);
           failedTickets.push(ticket);
