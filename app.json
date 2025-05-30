@@ -49,11 +49,12 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "78cc6f02-f835-4c90-acf5-edf271b9654c"
+        "projectId": "0051db0d-fbc8-4f8a-bbf3-03da51f64fee"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    }
+    },
+    "owner": "test-tickets"
   }
 }
