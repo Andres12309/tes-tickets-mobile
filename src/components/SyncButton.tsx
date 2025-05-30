@@ -9,7 +9,7 @@ const SyncButton = () => {
 
   const handleSync = async () => {
     if (!isSyncing) {
-      await syncTickets();
+      await syncTickets(true);
     }
   };
 

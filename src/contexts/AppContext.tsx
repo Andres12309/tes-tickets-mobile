@@ -133,7 +133,7 @@ type AppContextType = AppState & {
   handleGetPeriodo: () => Promise<void>;
   handleGetNomina: () => Promise<void>;
   handleCrearTicket: (userCode: string) => Promise<void>;
-  syncTickets: () => Promise<void>;
+  syncTickets: (force: boolean) => Promise<void>;
   speak: (text: string) => void;
 };
 
@@ -671,12 +671,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
   // Función para sincronizar tickets
   const LAST_SYNC_KEY = "last_sync";
-  const syncTickets = async (): Promise<void> => {
+  const syncTickets = async (force = false): Promise<void> => {
     const lastSync = await AsyncStorage.getItem(LAST_SYNC_KEY);
 
     const now = Date.now();
 
-    if (lastSync && now - parseInt(lastSync) < 5 * 60 * 1000) {
+    if (!force && lastSync && now - parseInt(lastSync) < 5 * 60 * 1000) {
       return; // No sincronizar si pasaron menos de 5 min
     }
 
