@@ -1,19 +1,12 @@
 {
   "expo": {
     "name": "tickets-mobile",
-    "slug": "tickets-mobile",
     "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "ticketsmobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "updates": {
-      "enabled": true,
-      "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/78cc6f02-f835-4c90-acf5-edf271b9654c"
-    },
     "ios": {
       "supportsTablet": true
     },
@@ -49,12 +42,12 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "0051db0d-fbc8-4f8a-bbf3-03da51f64fee"
+        "projectId": "8406256c-7d1c-414e-9d36-7881ea05feeb"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "owner": "test-tickets"
+    "owner": "andresdev1868"
   }
 }

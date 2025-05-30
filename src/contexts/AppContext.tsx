@@ -4,6 +4,7 @@ import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
 import * as Speech from "expo-speech";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
   createContext,
   ReactNode,
@@ -11,6 +12,7 @@ import React, {
   useEffect,
   useState,
 } from "react";
+import { AppState as stateNative } from "react-native";
 import { io, Socket } from "socket.io-client";
 import { v5 as uuidv5 } from "uuid";
 import { periodoService, ticketService, usuarioService } from "../services/api";
@@ -163,6 +165,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     },
     isSyncing: false,
   });
+  const [appState, setAppState] = useState(stateNative.currentState);
+
+  useEffect(() => {
+    const subscription = stateNative.addEventListener("change", (nextState) => {
+      setAppState(nextState);
+    });
+    return () => subscription.remove();
+  }, []);
 
   // Inicializar la base de datos y cargar datos iniciales
   useEffect(() => {
@@ -178,7 +188,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         await handleGetPeriodo(true); // Forzar carga local primero
 
         // 3. Si hay conexión, sincronizar con el servidor
-        if (state.isOnline) {
+        if (state.isOnline && appState === "active") {
           await syncTickets();
         }
       } catch (error) {
@@ -271,7 +281,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       }
     };
 
-    // loadInitialData();
+    loadInitialData();
   }, []);
 
   // Efecto para manejar cambios en la conexión
@@ -284,10 +294,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       setIsOnline(isNowOnline);
 
       // Sincronizar datos cuando se recupera la conexión
-      if (wasOffline) {
+      if (wasOffline && appState === "active") {
         console.log("Conexión recuperada, sincronizando datos...");
         // Actualizar datos del servidor cuando se recupera la conexión
-        // handleGetPeriodo();
+        handleGetPeriodo();
         handleGetNomina();
         syncTickets();
       }
@@ -312,7 +322,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     const refreshLocalStats = async () => {
       await updateLocalStats();
     };
-    refreshLocalStats();
+    if (appState === "active") {
+      refreshLocalStats();
+    }
   }, [state.tickets, state.periodo, state.preComidaActual]);
 
   // Funciones de ayuda
@@ -658,7 +670,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   // Función para sincronizar tickets
+  const LAST_SYNC_KEY = "last_sync";
   const syncTickets = async (): Promise<void> => {
+    const lastSync = await AsyncStorage.getItem(LAST_SYNC_KEY);
+
+    const now = Date.now();
+
+    if (lastSync && now - parseInt(lastSync) < 5 * 60 * 1000) {
+      return; // No sincronizar si pasaron menos de 5 min
+    }
+
     if (!state.periodo || !state.preComidaActual) {
       console.warn("No se puede sincronizar: falta período o comida actual");
       return;
@@ -811,6 +832,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       setShowError(true);
       speak("Error al sincronizar");
     } finally {
+      await AsyncStorage.setItem(LAST_SYNC_KEY, now.toString());
       await updateLocalStats();
       setTimeout(() => {
         setShowError(false);
