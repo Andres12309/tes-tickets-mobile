@@ -425,7 +425,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
       // updateLocalStats();
     } catch (error) {
-      console.error("Error al cargar tickets:", error);
+      // console.error("Error al cargar tickets:", error);
       setState((prev) => ({
         ...prev,
         errorMessage: ["No se pudieron cargar los tickets"],
@@ -584,7 +584,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         throw new Error("No se pudo cargar ningún período, ni local ni remoto");
       }
     } catch (error) {
-      console.error("Error al obtener período:", error);
+      // console.error("Error al obtener período:", error);
       setState((prev) => ({
         ...prev,
         errorMessage: ["No se pudo cargar el período"],
@@ -642,7 +642,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         throw new Error("No se encontraron usuarios");
       }
     } catch (error) {
-      console.error("Error al cargar nómina:", error);
+      // console.error("Error al cargar nómina:", error);
       setState((prev) => ({
         ...prev,
         errorMessage: ["No se pudo cargar la nómina de usuarios"],
@@ -828,7 +828,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
             failedTickets.push(ticket);
           }
         } catch (error) {
-          console.error("Error al sincronizar ticket:", error);
+          // console.error("Error al sincronizar ticket:", error);
           failedTickets.push(ticket);
         }
       }
@@ -843,7 +843,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
           await ticketDb.deleteTicketByUuid(ticket.uuid4);
           console.log("Ticket eliminado:", ticket.uuid4);
         } catch (error) {
-          console.error("Error al eliminar ticket:", error);
+          // console.error("Error al eliminar ticket:", error);
           failedTickets.push(ticket);
         }
       }
@@ -855,7 +855,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         speak(`Sincronización parcial. ${failedTickets.length} pendientes.`);
       }
     } catch (error) {
-      console.error("Error en la sincronización:", error);
+      // console.error("Error en la sincronización:", error);
       setErrorMessage(["Error al sincronizar"]);
       setShowError(true);
       speak("Error al sincronizar");
@@ -895,7 +895,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         // Actualizar lista de tickets y estadísticas
       }
     } catch (error) {
-      console.error("Error al guardar el ticket:", error);
+      // console.error("Error al guardar el ticket:", error);
       setErrorMessage(["Error al guardar el pedido"]);
       setShowError(true);
     } finally {
@@ -1041,7 +1041,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       // Guardar localmente si no hay conexión o falla la llamada al servidor
       await handleSaveTicket(ticketData, user);
     } catch (error: any) {
-      console.error("Error al crear ticket:", error);
+      // console.error("Error al crear ticket:", error);
       setState((prev) => ({
         ...prev,
         errorMessage: [error.message || "Error al procesar la solicitud"],

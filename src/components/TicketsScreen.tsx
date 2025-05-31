@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { useAppContext } from "../contexts/AppContext";
 import LoadingAnimado from "./LoadingAnimado";
 import SyncButton from "./SyncButton";
@@ -25,12 +26,9 @@ const TicketsScreen = () => {
     showError,
     showSuccess,
     handleCrearTicket,
-    speak,
-    setShowError,
-    setShowSuccess,
     handleGetPeriodo,
+    handleGetNomina,
     preComidaActual,
-    ticketsCount,
     isAppInitialized,
   } = useAppContext();
 
@@ -243,8 +241,30 @@ const TicketsScreen = () => {
     <View style={styles.container}>
       {/* Encabezado */}
       <View style={styles.header}>
-        <Text style={styles.title}>Tickets Updated</Text>
-        {renderConnectionStatus()}
+        <Text style={styles.title}>Tickets</Text>
+        <View style={styles.syncGroup}>
+          <TouchableOpacity
+            style={[styles.syncButton, loading && styles.syncButtonDisabled]}
+            onPress={handleGetPeriodo}
+            disabled={loading}
+          >
+            <Text style={styles.statusText}>
+              <Icon name="sync" size={15} color="#fff" />
+              Periodo
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.syncButton, loading && styles.syncButtonDisabled]}
+            onPress={handleGetNomina}
+            disabled={loading}
+          >
+            <Text style={styles.statusText}>
+              <Icon name="sync" size={15} color="#fff" />
+              Nómina
+            </Text>
+          </TouchableOpacity>
+          {renderConnectionStatus()}
+        </View>
       </View>
 
       <View
@@ -253,7 +273,7 @@ const TicketsScreen = () => {
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
-          alignContent:"space-between",
+          alignContent: "space-between",
           padding: 2,
           marginBottom: 10,
         }}
@@ -447,6 +467,24 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: "#495057",
     marginTop: 8,
+  },
+  syncGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 2,
+  },
+  syncButton: {
+    backgroundColor: "grey",
+    width: 80,
+    height: 30,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 2,
+  },
+  syncButtonDisabled: {
+    backgroundColor: "#90CAF9",
   },
 });
 
