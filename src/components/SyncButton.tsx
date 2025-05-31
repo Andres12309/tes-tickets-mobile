@@ -51,9 +51,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#f5f5f5',
-    padding: 10,
+    padding: 5,
     borderRadius: 8,
-    margin: 10,
     elevation: 2,
   },
   syncButton: {

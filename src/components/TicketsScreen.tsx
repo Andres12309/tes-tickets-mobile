@@ -248,7 +248,15 @@ const TicketsScreen = () => {
       </View>
 
       <View
-        style={{ display: "flex", flexDirection: "row", alignItems: "center" }}
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          alignContent:"space-between",
+          padding: 2,
+          marginBottom: 10,
+        }}
       >
         {/* Información del período */}
         {renderPeriodoInfo()}
@@ -300,13 +308,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
-    padding: 16,
+    padding: 20,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 15,
   },
   title: {
     fontSize: 24,
@@ -325,7 +333,6 @@ const styles = StyleSheet.create({
   },
   periodoContainer: {
     alignItems: "center",
-    marginBottom: 24,
   },
   periodoText: {
     fontSize: 20,
@@ -351,7 +358,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 12,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
