@@ -243,7 +243,7 @@ const TicketsScreen = () => {
     <View style={styles.container}>
       {/* Encabezado */}
       <View style={styles.header}>
-        <Text style={styles.title}>Tickets</Text>
+        <Text style={styles.title}>Tickets Updated</Text>
         {renderConnectionStatus()}
       </View>
 
