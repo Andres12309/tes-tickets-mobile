@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { useAppContext } from "../contexts/AppContext";
+import LoadingAnimado from "./LoadingAnimado";
 import SyncButton from "./SyncButton";
 
 const TicketsScreen = () => {
@@ -30,6 +31,7 @@ const TicketsScreen = () => {
     handleGetPeriodo,
     preComidaActual,
     ticketsCount,
+    isAppInitialized,
   } = useAppContext();
 
   const [code, setCode] = useState<string>("");
@@ -232,6 +234,11 @@ const TicketsScreen = () => {
     );
   }
 
+  // Mostrar un loading mientras se inicializa la app
+  if (!isAppInitialized) {
+    return <LoadingAnimado />;
+  }
+
   return (
     <View style={styles.container}>
       {/* Encabezado */}
@@ -279,9 +286,9 @@ const TicketsScreen = () => {
       {errorMessage && errorMessage.length > 0 && showError && (
         <View style={styles.successContainer}>
           <MaterialIcons name="error" size={64} color="#F44336" />
-          <Text style={styles.errorText}>Error al registrar el ticket</Text>
+          <Text style={styles.errorText}>{errorMessage}</Text>
           <Text style={styles.userText}>
-            {user ? `${user.nombres} ${user.apellidos}` : "Usuario desconocido"}
+            {user ? `${user.nombres} ${user.apellidos}` : errorMessage[1]}
           </Text>
         </View>
       )}

@@ -135,6 +135,7 @@ type AppContextType = AppState & {
   handleCrearTicket: (userCode: string) => Promise<void>;
   syncTickets: (force: boolean) => Promise<void>;
   speak: (text: string) => void;
+  isAppInitialized: boolean;
 };
 
 // Contexto
@@ -145,6 +146,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   // Estado inicial
+  const [isAppInitialized, setIsAppInitialized] = useState(false);
   const [state, setState] = useState<AppState>({
     tickets: [],
     user: null,
@@ -178,21 +180,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        setLoading(true);
         // 1. Inicializar base de datos
         await initDatabase();
         console.log("Base de datos inicializada correctamente");
 
         // 2. Cargar datos locales primero para una experiencia más rápida
         await handleGetNomina(true); // Forzar carga local primero
-
         await handleGetPeriodo(true); // Forzar carga local primero
 
         // 3. Si hay conexión, sincronizar con el servidor
         if (state.isOnline && appState === "active") {
           await syncTickets();
         }
+
+        console.log("Datos iniciales cargados correctamente");
+        // Marcar la aplicación como inicializada
+        setIsAppInitialized(true);
       } catch (error) {
-        // console.error("Error al inicializar la aplicación:", error);
+        console.error("Error al inicializar la aplicación:", error);
         setErrorMessage(["Error al cargar los datos iniciales"]);
         setShowError(true);
       } finally {
@@ -268,26 +274,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     };
   }, []);
 
-  // Cargar datos iniciales después de inicializar la base de datos
-  useEffect(() => {
-    const loadInitialData = async () => {
-      // Cargar datos locales primero para una experiencia más rápida
-
-      // Si hay conexión, sincronizar con el servidor
-      if (state.isOnline) {
-        await handleGetNomina(); // Esto actualizará con datos del servidor
-        await handleGetPeriodo(); // Esto actualizará con datos del servidor
-        await syncTickets();
-      }
-    };
-
-    loadInitialData();
-  }, []);
+  const loadInitialData = async () => {
+    await handleGetNomina(); // Esto actualizará con datos del servidor
+    await handleGetPeriodo(); // Esto actualizará con datos del servidor
+    await syncTickets();
+  };
 
   // Efecto para manejar cambios en la conexión
   useEffect(() => {
     // Configurar el listener de conexión
-    const unsubscribe = NetInfo.addEventListener((connectionState) => {
+    const unsubscribe = NetInfo.addEventListener(async (connectionState) => {
       const isNowOnline = connectionState.isConnected || false;
       const wasOffline = !state.isOnline && isNowOnline;
 
@@ -296,10 +292,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       // Sincronizar datos cuando se recupera la conexión
       if (wasOffline && appState === "active") {
         console.log("Conexión recuperada, sincronizando datos...");
-        // Actualizar datos del servidor cuando se recupera la conexión
-        handleGetPeriodo();
-        handleGetNomina();
-        syncTickets();
+        await loadInitialData();
       }
     });
 
@@ -432,7 +425,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
       // updateLocalStats();
     } catch (error) {
-      // console.error("Error al cargar tickets:", error);
+      console.error("Error al cargar tickets:", error);
       setState((prev) => ({
         ...prev,
         errorMessage: ["No se pudieron cargar los tickets"],
@@ -445,32 +438,53 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   // Función para obtener el período local
-  const handleGetPeriodoLocal = async (): Promise<void> => {
+  const handleGetPeriodoLocal = async () => {
     try {
-      setLoading(true);
+      let periodoData: Periodo | null = null;
+      let comidasPeriodo: PreComidaPeriodo[] = [];
+      if (!periodoData) {
+        periodoData = await periodoDb.getCurrentPeriodo();
 
-      // Obtener período local
-      const localPeriodo = await periodoDb.getCurrentPeriodo();
-      if (localPeriodo) {
-        setPeriodo(localPeriodo);
-        setState((prev) => ({
-          ...prev,
-          periodoCode: "ok",
-          preComidaActual: getCurrentMeal(localPeriodo) || null,
-        }));
+        // Si hay un período local, cargar sus comidas relacionadas
+        if (periodoData) {
+          comidasPeriodo = await comidaDb.getComidasByPeriodo(
+            periodoData.pre_periodo_id
+          );
+        }
+      }
+
+      // 3. Validar y establecer el período
+      if (periodoData) {
+        // Asegurarse de que el objeto tenga la estructura correcta
+        const validPeriodo: Periodo = {
+          pre_periodo_id: periodoData.pre_periodo_id,
+          nombre: periodoData.nombre || "Periodo Actual",
+          fecha_inicio:
+            periodoData.fecha_inicio || new Date().toISOString().split("T")[0],
+          fecha_fin:
+            periodoData.fecha_fin ||
+            new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+              .toISOString()
+              .split("T")[0],
+          activo: periodoData.activo ?? true,
+          estado: periodoData.estado ?? true,
+          create_at: periodoData.create_at || new Date().toISOString(),
+          pre_comidas_periodo: comidasPeriodo || [],
+          pre_dias_inactivos: periodoData.pre_dias_inactivos || [],
+          sync: periodoData.sync ?? true,
+        };
+
+        return validPeriodo;
       } else {
         throw new Error("No hay datos locales disponibles");
       }
     } catch (error) {
-      // console.error("Error al obtener período local:", error);
       setState((prev) => ({
         ...prev,
-        periodoCode: "error",
-        errorMessage: ["No se pudo obtener el período actual"],
+        errorMessage: ["No se pudo cargar el período local"],
         showError: true,
       }));
-    } finally {
-      setLoading(false);
+      return null;
     }
   };
 
@@ -569,9 +583,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       } else {
         throw new Error("No se pudo cargar ningún período, ni local ni remoto");
       }
-      console.log("Período cargado:", periodoData);
     } catch (error) {
-      // console.error("Error al obtener período:", error);
+      console.error("Error al obtener período:", error);
       setState((prev) => ({
         ...prev,
         errorMessage: ["No se pudo cargar el período"],
@@ -587,29 +600,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     try {
       setLoading(true);
       let users: User[] = [];
-
       // 1. Si hay conexión y no forzamos carga local, intentar obtener del servidor
-      try {
-        const res = await usuarioService.getTotalUsers();
-        if (res.sms === "ok") {
-          const totalPages = Math.ceil(res.data / 300);
-          for (let i = 0; i <= totalPages; i++) {
-            const response = await usuarioService.getAllUsers(i + 1, 300, true);
-            if (response.data) {
-              users = [...users, ...response.data];
+      if (state.isOnline) {
+        try {
+          const res = await usuarioService.getTotalUsers();
+          if (res.sms === "ok") {
+            const totalPages = Math.ceil(res.data / 300);
+            for (let i = 0; i <= totalPages; i++) {
+              const response = await usuarioService.getAllUsers(
+                i + 1,
+                300,
+                true
+              );
+              if (response.data) {
+                users = [...users, ...response.data];
+              }
             }
           }
+          for (const user of users) {
+            await userDb.saveUser(user);
+          }
+        } catch (serverError) {
+          console.warn(
+            "Error al obtener nómina del servidor, usando caché local",
+            serverError
+          );
         }
-        for (const user of users) {
-          await userDb.saveUser(user);
-        }
-      } catch (serverError) {
-        console.warn(
-          "Error al obtener nómina del servidor, usando caché local",
-          serverError
-        );
       }
-
       console.log("Usuarios obtenidos del servidor:", users.length);
 
       // 2. Cargar usuarios de la base de datos local
@@ -625,7 +642,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         throw new Error("No se encontraron usuarios");
       }
     } catch (error) {
-      // console.error("Error al cargar nómina:", error);
+      console.error("Error al cargar nómina:", error);
       setState((prev) => ({
         ...prev,
         errorMessage: ["No se pudo cargar la nómina de usuarios"],
@@ -673,17 +690,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   const LAST_SYNC_KEY = "last_sync";
   const syncTickets = async (force = false): Promise<void> => {
     const lastSync = await AsyncStorage.getItem(LAST_SYNC_KEY);
-
     const now = Date.now();
 
     if (!force && lastSync && now - parseInt(lastSync) < 5 * 60 * 1000) {
       return; // No sincronizar si pasaron menos de 5 min
     }
 
-    if (!state.periodo || !state.preComidaActual) {
-      console.warn("No se puede sincronizar: falta período o comida actual");
+    if(!state.isOnline){
+      setState((prev) => ({ ...prev, isSyncing: false }));
+      setErrorMessage(["No hay conexión a internet"]);
+      setShowError(true);
+      speak("No hay conexión a internet");
+      setTimeout(() => {
+        setState((prev) => ({ ...prev, isSyncing: false, showError: false, showSuccess: false }));
+      }, 1000);
       return;
     }
+
+    const periodoLocal = await handleGetPeriodoLocal();
 
     setState((prev) => ({ ...prev, isSyncing: true }));
 
@@ -725,10 +749,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
           serverTickets = [...serverTickets, ...response.data.tickets];
         }
       }
+      if (!periodoLocal) {
+        console.warn("No se puede sincronizar: falta período o comida actual");
+        return;
+      }
 
       // 2.3 Filtrar por comida actual
       const filteredServerTickets = serverTickets.filter(
-        (t) => t.pre_comida_id === state.preComidaActual?.pre_comida_id
+        (t) => t.pre_comida_id === getCurrentMeal(periodoLocal)?.pre_comida_id
       );
 
       const serverTicketsMap = new Map(
@@ -800,7 +828,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
             failedTickets.push(ticket);
           }
         } catch (error) {
-          // console.error("Error al sincronizar ticket:", error);
+          console.error("Error al sincronizar ticket:", error);
           failedTickets.push(ticket);
         }
       }
@@ -815,7 +843,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
           await ticketDb.deleteTicketByUuid(ticket.uuid4);
           console.log("Ticket eliminado:", ticket.uuid4);
         } catch (error) {
-          // console.error("Error al eliminar ticket:", error);
+          console.error("Error al eliminar ticket:", error);
           failedTickets.push(ticket);
         }
       }
@@ -827,7 +855,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         speak(`Sincronización parcial. ${failedTickets.length} pendientes.`);
       }
     } catch (error) {
-      // console.error("Error en la sincronización:", error);
+      console.error("Error en la sincronización:", error);
       setErrorMessage(["Error al sincronizar"]);
       setShowError(true);
       speak("Error al sincronizar");
@@ -867,7 +895,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         // Actualizar lista de tickets y estadísticas
       }
     } catch (error) {
-      // console.error("Error al guardar el ticket:", error);
+      console.error("Error al guardar el ticket:", error);
       setErrorMessage(["Error al guardar el pedido"]);
       setShowError(true);
     } finally {
@@ -880,6 +908,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   const handleCrearTicket = async (userCode: string): Promise<void> => {
+    if (!isAppInitialized) {
+      setState((prev) => ({
+        ...prev,
+        errorMessage: [
+          "La aplicación aún no ha terminado de cargar. Por favor espere...",
+          "La información se está cargando.... Por favor espere.",
+        ],
+        showError: true,
+      }));
+      speak("Aún no estoy lista. Por favor espere un momento.");
+      return;
+    }
+
     if (!userCode || userCode.trim() === "") {
       setState((prev) => ({
         ...prev,
@@ -1000,7 +1041,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       // Guardar localmente si no hay conexión o falla la llamada al servidor
       await handleSaveTicket(ticketData, user);
     } catch (error: any) {
-      // console.error("Error al crear ticket:", error);
+      console.error("Error al crear ticket:", error);
       setState((prev) => ({
         ...prev,
         errorMessage: [error.message || "Error al procesar la solicitud"],
@@ -1060,6 +1101,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         handleCrearTicket,
         syncTickets,
         speak,
+        isAppInitialized,
       }}
     >
       {children}

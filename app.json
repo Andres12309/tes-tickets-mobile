@@ -45,8 +45,9 @@
         "projectId": "8406256c-7d1c-414e-9d36-7881ea05feeb"
       }
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
+    "runtimeVersion": "1.0.1",
+    "updates": {
+      "url": "https://u.expo.dev/8406256c-7d1c-414e-9d36-7881ea05feeb"
     },
     "owner": "andresdev1868"
   }
