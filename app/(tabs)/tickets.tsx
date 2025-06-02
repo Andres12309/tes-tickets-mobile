@@ -3,7 +3,7 @@ import { ticketDb } from "@/src/services/database";
 import { Ticket } from "@/src/types/database";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -11,6 +11,7 @@ import {
   SafeAreaView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -25,6 +26,9 @@ interface TicketWithUser extends Ticket {
 export default function TicketsScreen() {
   const { tickets, handleGetTickets } = useAppContext();
   const [localTickets, setLocalTickets] = useState<TicketWithUser[]>([]);
+  const [searchCode, setSearchCode] = useState("");
+  const [searchName, setSearchName] = useState("");
+  const [showPendingOnly, setShowPendingOnly] = useState(false);
 
   // Cargar tickets locales al enfocar la pantalla
   useFocusEffect(
@@ -91,8 +95,7 @@ export default function TicketsScreen() {
       <View style={styles.ticketItem}>
         <View style={styles.ticketInfo}>
           <Text style={styles.ticketUser}>
-            {item.nombres || "Usuario"} {item.apellidos || ""} - {" "}
-            {item.code || "Código no disponible"}
+            {`${item.nombres || "Usuario"} ${item.apellidos || ""} - ${item.code || "Código no disponible"}`}
           </Text>
           <Text style={styles.ticketDate}>
             {item.create_at
@@ -120,21 +123,128 @@ export default function TicketsScreen() {
     );
   };
 
+  // Filter tickets based on search criteria and sync status
+  const filteredTickets = useMemo(() => {
+    return localTickets.filter(ticket => {
+      const matchesCode = !searchCode || 
+        (ticket.code && ticket.code.toLowerCase().includes(searchCode.toLowerCase()));
+      
+      const fullName = `${ticket.nombres || ''} ${ticket.apellidos || ''}`.toLowerCase();
+      const matchesName = !searchName || 
+        fullName.includes(searchName.toLowerCase());
+      
+      const matchesSyncStatus = !showPendingOnly || ticket.sync_pending;
+      
+      return matchesCode && matchesName && matchesSyncStatus;
+    });
+  }, [localTickets, searchCode, searchName, showPendingOnly]);
+
+  const clearFilters = () => {
+    setSearchCode('');
+    setSearchName('');
+    setShowPendingOnly(false);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Tickets Registrados</Text>
-      {localTickets.length > 0 ? (
-        <FlatList
-          data={localTickets}
-          keyExtractor={(item) => item.uuid4}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContainer}
-        />
-      ) : (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No hay tickets registrados</Text>
+      <View style={styles.contentContainer}>
+        <Text style={styles.title}>Tickets Registrados</Text>
+        
+        {/* Search Filters */}
+        <View style={styles.searchSection}>
+          <View style={styles.searchContainer}>
+            <View style={styles.searchInputContainer}>
+              <MaterialIcons name="search" size={20} color="#6c757d" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Buscar por código..."
+                value={searchCode}
+                onChangeText={setSearchCode}
+                placeholderTextColor="#6c757d"
+              />
+              {searchCode ? (
+                <TouchableOpacity onPress={() => setSearchCode('')} style={styles.clearButton}>
+                  <MaterialIcons name="close" size={18} color="#6c757d" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            
+            <View style={[styles.searchInputContainer, { marginTop: 8 }]}>
+              <MaterialIcons name="person-search" size={20} color="#6c757d" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Buscar por nombre..."
+                value={searchName}
+                onChangeText={setSearchName}
+                placeholderTextColor="#6c757d"
+              />
+              {searchName ? (
+                <TouchableOpacity onPress={() => setSearchName('')} style={styles.clearButton}>
+                  <MaterialIcons name="close" size={18} color="#6c757d" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            
+            <View style={styles.filtersRow}>
+              <TouchableOpacity 
+                onPress={() => setShowPendingOnly(!showPendingOnly)}
+                style={[styles.filterButton, showPendingOnly && styles.filterButtonActive]}
+              >
+                <MaterialIcons 
+                  name={showPendingOnly ? "sync-problem" : "sync"} 
+                  size={18} 
+                  color={showPendingOnly ? "#fff" : "#4dabf7"} 
+                />
+                <Text style={[styles.filterButtonText, showPendingOnly && styles.filterButtonTextActive]}>
+                  {showPendingOnly ? "Ocultar pendientes" : "Ver pendientes"}
+                </Text>
+                {showPendingOnly && (
+                  <View style={styles.pendingBadge}>
+                    <Text style={styles.pendingBadgeText}>
+                      {localTickets.filter(t => t.sync_pending).length}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              
+              {(searchCode || searchName || showPendingOnly) && (
+                <TouchableOpacity 
+                  onPress={clearFilters} 
+                  style={[styles.clearAllButton, { marginLeft: 8 }]}
+                >
+                  <Text style={styles.clearAllText}>Limpiar filtros</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
         </View>
-      )}
+        
+        {/* Results count */}
+        <View style={styles.resultsContainer}>
+          <Text style={styles.resultsCount}>
+            {filteredTickets.length} {filteredTickets.length === 1 ? 'resultado' : 'resultados'}
+          </Text>
+        </View>
+        
+        {filteredTickets.length > 0 ? (
+          <FlatList
+            data={filteredTickets}
+            keyExtractor={(item) => item.uuid4}
+            renderItem={renderItem}
+            contentContainerStyle={styles.listContainer}
+          />
+        ) : (
+          <View style={styles.emptyContainer}>
+            <MaterialIcons name="search-off" size={48} color="#adb5bd" />
+            <Text style={styles.emptyText}>No se encontraron tickets</Text>
+            {(searchCode || searchName) && (
+              <TouchableOpacity onPress={clearFilters} style={styles.tryAgainButton}>
+                <Text style={styles.tryAgainText}>Limpiar búsqueda</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -143,13 +253,113 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
+  },
+  contentContainer: {
+    flex: 1,
     padding: 16,
+  },
+  searchSection: {
+    marginBottom: 16,
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 20,
+    marginBottom: 16,
     color: "#212529",
+  },
+  searchContainer: {
+    marginBottom: 16,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 48,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: '100%',
+    fontSize: 16,
+    color: '#212529',
+  },
+  clearButton: {
+    padding: 4,
+  },
+  filtersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    flexWrap: 'wrap',
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#4dabf7',
+    backgroundColor: '#fff',
+  },
+  filterButtonActive: {
+    backgroundColor: '#4dabf7',
+  },
+  filterButtonText: {
+    marginLeft: 6,
+    color: '#4dabf7',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  filterButtonTextActive: {
+    color: '#fff',
+  },
+  pendingBadge: {
+    marginLeft: 6,
+    backgroundColor: '#ff6b6b',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pendingBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  clearAllButton: {
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+  },
+  clearAllText: {
+    color: '#6c757d',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  resultsContainer: {
+    marginBottom: 12,
+  },
+  resultsCount: {
+    color: '#6c757d',
+    fontSize: 14,
   },
   listContainer: {
     paddingBottom: 20,
@@ -199,20 +409,33 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
   },
   emptyText: {
     fontSize: 16,
     color: "#6c757d",
+    marginTop: 16,
+    textAlign: 'center',
   },
   syncPendingText: {
     color: "#ff6b6b",
     fontSize: 12,
     marginTop: 4,
   },
+  tryAgainButton: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#f1f3f5',
+    borderRadius: 8,
+  },
+  tryAgainText: {
+    color: '#4dabf7',
+    fontWeight: '500',
+  },
   syncedText: {
-    color: "#4caf50",
+    color: "#51cf66",
     fontSize: 12,
     marginTop: 4,
   },

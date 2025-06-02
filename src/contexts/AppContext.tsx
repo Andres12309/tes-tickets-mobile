@@ -191,9 +191,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         await handleGetPeriodo(true); // Forzar carga local primero
 
         // 3. Si hay conexión, sincronizar con el servidor
-        if (state.isOnline && appState === "active") {
-          await syncTickets();
-        }
+        // if (state.isOnline && appState === "active") {
+        //   await syncTickets();
+        // }
 
         console.log("Datos iniciales cargados correctamente");
         // Marcar la aplicación como inicializada
@@ -213,7 +213,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
     setLoading(true);
     initializeApp();
-  }, [state.isOnline]);
+  }, []);
 
   // Socket
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -291,10 +291,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       setIsOnline(isNowOnline);
 
       // Sincronizar datos cuando se recupera la conexión
-      if (wasOffline && appState === "active") {
-        console.log("Conexión recuperada, sincronizando datos...");
-        await loadInitialData();
-      }
+      // if (wasOffline && appState === "active" && isAppInitialized) {
+      //   console.log("Conexión recuperada, sincronizando datos...");
+      //   await loadInitialData();
+      // }
     });
 
     // Obtener el estado inicial de la conexión
@@ -309,7 +309,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     return () => {
       unsubscribe();
     };
-  }, [state.isOnline]);
+  }, []);
 
   // Refrescar updateLocalStats
   useEffect(() => {
@@ -602,7 +602,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       setLoading(true);
       let users: User[] = [];
       // 1. Si hay conexión y no forzamos carga local, intentar obtener del servidor
-      if (state.isOnline) {
+      if (state.isOnline && !forceLocal) {
         try {
           const res = await usuarioService.getTotalUsers();
           if (res.sms === "ok") {

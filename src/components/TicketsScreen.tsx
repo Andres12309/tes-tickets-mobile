@@ -1,7 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -31,7 +31,7 @@ const TicketsScreen = () => {
     preComidaActual,
     isAppInitialized,
   } = useAppContext();
-
+  const inputRef = useRef(null);
   const [code, setCode] = useState<string>("");
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
@@ -89,8 +89,7 @@ const TicketsScreen = () => {
       ["4", "5", "6"],
       ["7", "8", "9"],
       ["delete", "0", "enter"],
-      ["V", "P", "E"],
-      ["G", "X"],
+      ["V", "P", "E", "G"], // Letras en una sola fila
     ];
 
     return (
@@ -100,47 +99,43 @@ const TicketsScreen = () => {
             {row.map((key) => {
               let displayText = key;
               let onPress = () => handleKeyPress(key);
-              let style = styles.key;
-              let textStyle = styles.keyText;
+              // Crear un nuevo objeto de estilo para evitar mutaciones directas
+              const buttonStyle = { ...styles.key };
+              const buttonTextStyle = { ...styles.keyText };
 
               if (key === "delete") {
                 displayText = "⌫";
-                style = { ...style, backgroundColor: "#ff6b6b" };
-                textStyle = { ...textStyle, fontSize: 24 };
+                Object.assign(buttonStyle, { backgroundColor: "#ff6b6b" });
+                Object.assign(buttonTextStyle, { fontSize: 24 });
               } else if (key === "enter") {
                 displayText = "✓";
-                style = {
-                  ...style,
-                  backgroundColor: code.length > 0 ? "#51cf66" : "#868e96",
-                };
-                textStyle = { ...textStyle, fontSize: 28, color: "white" };
+                const enterBgColor = code.length > 0 ? "#51cf66" : "#868e96";
+                Object.assign(buttonStyle, { backgroundColor: enterBgColor });
+                Object.assign(buttonTextStyle, {
+                  fontSize: 28,
+                  color: "white",
+                });
                 onPress =
                   code.length > 0 ? () => handleKeyPress("enter") : () => {};
               } else if (key === "V") {
                 displayText = "V";
-                style = {
-                  ...style,
-                  backgroundColor: "#4dabf7",
-                };
+                Object.assign(buttonStyle, { backgroundColor: "#4dabf7" });
               } else if (key === "P") {
                 displayText = "P";
-                style = { ...style, backgroundColor: "#f59e0b" };
+                Object.assign(buttonStyle, { backgroundColor: "#f59e0b" });
               } else if (key === "E") {
                 displayText = "E";
-                style = { ...style, backgroundColor: "#10b981" };
+                Object.assign(buttonStyle, { backgroundColor: "#10b981" });
               } else if (key === "G") {
                 displayText = "G";
-                style = { ...style, backgroundColor: "#8b5cf6" };
-              } else if (key === "X") {
-                displayText = "X";
-                style = { ...style, backgroundColor: "#dc2626" };
+                Object.assign(buttonStyle, { backgroundColor: "#8b5cf6" });
               }
 
               return (
                 <TouchableOpacity
                   key={key}
                   style={[
-                    style,
+                    buttonStyle,
                     key === "enter"
                       ? { opacity: code.length > 0 ? 1 : 0.6 }
                       : null,
@@ -148,7 +143,7 @@ const TicketsScreen = () => {
                   onPress={onPress}
                   disabled={loading && key === "enter"}
                 >
-                  <Text style={textStyle}>{displayText}</Text>
+                  <Text style={buttonTextStyle}>{displayText}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -199,23 +194,18 @@ const TicketsScreen = () => {
     <View style={styles.codeContainer}>
       <TextInput
         style={styles.codeText}
-        value={code || "Ingrese su código"}
+        value={code}
         inputMode="none"
-        editable={false}
-        autoFocus={true}
+        ref={inputRef}
+        autoFocus
         onChangeText={(text) => {
-          if (text.includes(" ")) {
-            const parts = text.split(" ");
-            if (parts.length > 1) {
-              const c = parts[1];
-              handleCrearTicket(c);
-            }
+          const partes = text.trim().split(/\s+/);
+          const extractedCode = partes[1];
+
+          if (extractedCode) {
+            handleCrearTicket(extractedCode);
           } else {
-            if (text.length > 0) {
-              handleCrearTicket(text);
-            } else {
-              setCode(text);
-            }
+            setCode(text);
           }
         }}
       />
@@ -424,25 +414,28 @@ const styles = StyleSheet.create({
   },
   keypadRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 2,
+    justifyContent: "center",
+    marginBottom: 10,
+    flexWrap: "wrap",
   },
   key: {
+    flex: 1,
     width: "30%",
+    margin: 5,
     aspectRatio: 1.5,
-    backgroundColor: "white",
-    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
+    borderRadius: 10,
+    backgroundColor: "#e9ecef",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
       },
       android: {
-        elevation: 10,
+        elevation: 3,
       },
     }),
   },
