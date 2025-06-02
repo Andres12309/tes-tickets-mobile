@@ -276,6 +276,7 @@ const TicketsScreen = () => {
           alignContent: "space-between",
           padding: 2,
           marginBottom: 10,
+          marginTop: "auto",
         }}
       >
         {/* Información del período */}
@@ -285,12 +286,13 @@ const TicketsScreen = () => {
 
       {/* Contador de tickets */}
       {/* {renderTicketsCount()} */}
+      <View style={styles.centeredContent}>
+        {/* Código ingresado */}
+        {renderCodeInput()}
 
-      {/* Código ingresado */}
-      {renderCodeInput()}
-
-      {/* Teclado numérico */}
-      {renderNumericKeypad()}
+        {/* Teclado numérico */}
+        {renderNumericKeypad()}
+      </View>
 
       {/* Mensaje de éxito */}
       {showSuccess && user ? (
@@ -328,13 +330,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
-    padding: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 10,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 15,
+    marginTop: 5,
   },
   title: {
     fontSize: 24,
@@ -374,6 +378,7 @@ const styles = StyleSheet.create({
   },
   codeContainer: {
     height: 80,
+    width: "100%",
     backgroundColor: "white",
     borderRadius: 12,
     justifyContent: "center",
@@ -398,13 +403,23 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   keypadContainer: {
+    marginTop: 10,
+    display: "flex",
+    justifyContent: "center",
+    alignSelf: "center",
+    width: "100%",
+  },
+  centeredContent: {
+    width: "100%",
+    maxWidth: 400,
     marginTop: "auto",
-    marginBottom: 32,
+    alignItems: "center",
+    justifyContent: "center",
   },
   keypadRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 16,
+    padding: 2,
   },
   key: {
     width: "30%",
@@ -421,7 +436,7 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
       },
       android: {
-        elevation: 2,
+        elevation: 10,
       },
     }),
   },

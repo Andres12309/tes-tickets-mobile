@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "tickets-mobile",
-    "version": "1.0.1",
+    "name": "COMEDOR CIESA",
+    "slug": "tickets-mobile",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "ticketsmobile",
@@ -21,7 +22,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.ico"
     },
     "plugins": [
       "expo-router",

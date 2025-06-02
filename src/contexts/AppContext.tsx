@@ -132,6 +132,7 @@ type AppContextType = AppState & {
   setLoading: (loading: boolean) => void;
   handleGetPeriodo: () => Promise<void>;
   handleGetNomina: () => Promise<void>;
+  handleGetTickets: () => Promise<void>;
   handleCrearTicket: (userCode: string) => Promise<void>;
   syncTickets: (force: boolean) => Promise<void>;
   speak: (text: string) => void;
@@ -198,7 +199,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         // Marcar la aplicación como inicializada
         setIsAppInitialized(true);
       } catch (error) {
-        console.error("Error al inicializar la aplicación:", error);
+        // console.error("Error al inicializar la aplicación:", error);
         setErrorMessage(["Error al cargar los datos iniciales"]);
         setShowError(true);
       } finally {
@@ -696,13 +697,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       return; // No sincronizar si pasaron menos de 5 min
     }
 
-    if(!state.isOnline){
+    if (!state.isOnline) {
       setState((prev) => ({ ...prev, isSyncing: false }));
       setErrorMessage(["No hay conexión a internet"]);
       setShowError(true);
       speak("No hay conexión a internet");
       setTimeout(() => {
-        setState((prev) => ({ ...prev, isSyncing: false, showError: false, showSuccess: false }));
+        setState((prev) => ({
+          ...prev,
+          isSyncing: false,
+          showError: false,
+          showSuccess: false,
+        }));
       }, 1000);
       return;
     }
@@ -861,6 +867,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       speak("Error al sincronizar");
     } finally {
       await AsyncStorage.setItem(LAST_SYNC_KEY, now.toString());
+      setIsAppInitialized(true);
       await updateLocalStats();
       setTimeout(() => {
         setShowError(false);
@@ -1101,6 +1108,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         handleCrearTicket,
         syncTickets,
         speak,
+        handleGetTickets,
         isAppInitialized,
       }}
     >

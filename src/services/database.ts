@@ -265,6 +265,27 @@ const ticketDb = {
     }
   },
 
+  // Obtener todos los tickets con información detallada del usuario y la comida
+  getAllTickets: async (): Promise<any[]> => {
+    try {
+      const database = await getDatabase();
+      return await database.getAllAsync(
+        `SELECT t.*, 
+                u.nombres, 
+                u.apellidos,
+                u.code,
+                c.nombre as comida
+         FROM tickets t
+         LEFT JOIN users u ON t.pre_usuario_id = u.pre_usuario_id
+         LEFT JOIN comidas c ON t.pre_comida_id = c.pre_comida_id
+         ORDER BY t.create_at DESC`
+      );
+    } catch (error) {
+      console.error("Error al obtener tickets con detalles:", error);
+      return [];
+    }
+  },
+
   getTicket: async (ticketId: number): Promise<Ticket | null> => {
     try {
       const database = await getDatabase();
