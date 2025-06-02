@@ -277,6 +277,7 @@ const TicketsScreen = () => {
           padding: 2,
           marginBottom: 10,
           marginTop: "auto",
+          width: "100%",
         }}
       >
         {/* Información del período */}
@@ -332,6 +333,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8f9fa",
     paddingVertical: 20,
     paddingHorizontal: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    width: "100%",
+    height: "100%",
   },
   header: {
     flexDirection: "row",
@@ -339,6 +344,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 15,
     marginTop: 5,
+    width: "100%",
   },
   title: {
     fontSize: 24,
