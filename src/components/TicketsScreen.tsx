@@ -13,11 +13,16 @@ import {
   View,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import appConfig from "../../app.json";
 import { useAppContext } from "../contexts/AppContext";
 import { ticketDb } from "../services/database";
 import { TicketWithUser } from "../types/database";
 import LoadingAnimado from "./LoadingAnimado";
 import SyncButton from "./SyncButton";
+
+// Get the app version from app.json
+const appVersion = appConfig.expo.version || '1.0.2';
+const appRutineVersion = appConfig.expo.runtimeVersion.policy || '1.0.0';
 
 const TicketsScreen = () => {
   const {
@@ -34,6 +39,7 @@ const TicketsScreen = () => {
     handleGetNomina,
     preComidaActual,
     isAppInitialized,
+    syncStats,
   } = useAppContext();
 
   const inputRef = useRef(null);
@@ -304,12 +310,13 @@ const TicketsScreen = () => {
 
   return (
     <View style={styles.container}>
+      <Text style={styles.versionText}>v{appVersion}</Text>
       {/* Encabezado */}
       <View style={styles.header}>
         <View style={styles.titleWithCounter}>
           <Text style={styles.title}>Tickets</Text>
           <View style={styles.ticketCounter}>
-            <Text style={styles.ticketCounterText}>{recentTickets.length}</Text>
+            <Text style={styles.ticketCounterText}>{syncStats.total}</Text>
           </View>
         </View>
         <View style={styles.syncGroup}>
@@ -663,6 +670,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#f1f3f5",
     borderRadius: 20,
     marginLeft: 10,
+  },
+  versionText: {
+    position: 'absolute',
+    top: 5,
+    right: 10,
+    color: '#666',
+    fontSize: 12,
   },
 });
 

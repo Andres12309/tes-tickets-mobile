@@ -415,7 +415,7 @@ const ticketDb = {
          FROM tickets t
          LEFT JOIN users u ON t.pre_usuario_id = u.pre_usuario_id
          LEFT JOIN comidas c ON t.pre_comida_id = c.pre_comida_id
-         ORDER BY t.create_at DESC
+         ORDER BY t.id DESC
          LIMIT ?`,
         [limit]
       );
