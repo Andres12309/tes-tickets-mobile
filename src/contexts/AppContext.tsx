@@ -1,10 +1,11 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import * as Speech from "expo-speech";
-
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
   createContext,
   ReactNode,
@@ -24,6 +25,7 @@ import {
   userDb,
 } from "../services/database";
 const UUID_NAMESPACE = "1b671a64-40d5-491e-99b0-da01ff1f3341";
+const { StorageAccessFramework } = FileSystem;
 
 // Extender dayjs con los plugins necesarios
 dayjs.extend(utc);
@@ -103,6 +105,13 @@ interface TicketStats {
   synced: number;
 }
 
+interface SyncProgress {
+  current: number;
+  total: number;
+  status: "idle" | "fetching" | "processing" | "syncing" | "completed";
+  message: string;
+}
+
 type AppState = {
   tickets: Ticket[];
   user: User | null;
@@ -118,6 +127,7 @@ type AppState = {
   loading: boolean;
   syncStats: TicketStats;
   isSyncing: boolean;
+  syncProgress: SyncProgress;
 };
 
 type AppContextType = AppState & {
@@ -154,19 +164,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     periodo: null,
     preComidaActual: null,
     usuariosNomina: [],
-    isOnline: true,
+    isOnline: false,
     ticketsCount: 0,
     errorMessage: [],
     periodoCode: null,
     showError: false,
     showSuccess: false,
-    loading: false,
+    loading: true,
     syncStats: {
       total: 0,
       pending: 0,
       synced: 0,
     },
     isSyncing: false,
+    syncProgress: {
+      current: 0,
+      total: 0,
+      status: "idle",
+      message: "",
+    },
   });
   const [appState, setAppState] = useState(stateNative.currentState);
 
@@ -705,6 +721,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     setState((prev) => ({ ...prev, syncStats: stats }));
   };
 
+  // Función para actualizar el progreso de sincronización
+  const updateSyncProgress = (updates: Partial<SyncProgress>) => {
+    setState((prev) => ({
+      ...prev,
+      syncProgress: {
+        ...prev.syncProgress,
+        ...updates,
+      },
+    }));
+  };
+
   // Función para sincronizar tickets
   const LAST_SYNC_KEY = "last_sync";
   const syncTickets = async (force = false): Promise<void> => {
@@ -714,29 +741,66 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     if (!force && lastSync && now - parseInt(lastSync) < 5 * 60 * 1000) {
       return; // No sincronizar si pasaron menos de 5 min
     }
+    
+    // Inicializar el progreso
+    const resetProgress = (): SyncProgress => ({
+      current: 0,
+      total: 1, // Evitar división por cero
+      status: 'idle',
+      message: 'Preparando sincronización...'
+    });
+    
+    let progress = resetProgress();
+    const updateProgress = (updates: Partial<SyncProgress>) => {
+      progress = { ...progress, ...updates };
+      updateSyncProgress(progress);
+    };
 
-    if (!state.isOnline) {
-      setState((prev) => ({ ...prev, isSyncing: false }));
-      setErrorMessage(["No hay conexión a internet"]);
+        if (!state.isOnline) {
+      const errorMsg = "No hay conexión a internet";
+      updateProgress({
+        status: "idle",
+        message: errorMsg,
+        current: 0,
+        total: 1
+      });
+      setErrorMessage([errorMsg]);
       setShowError(true);
-      speak("No hay conexión a internet");
+      speak(errorMsg);
       setTimeout(() => {
-        setState((prev) => ({
+        setState(prev => ({
           ...prev,
           isSyncing: false,
           showError: false,
           showSuccess: false,
+          syncProgress: resetProgress()
         }));
       }, 1000);
       return;
     }
 
-    const periodoLocal = await handleGetPeriodoLocal();
+    // Iniciar sincronización
+    setState(prev => ({
+      ...prev,
+      isSyncing: true,
+      syncProgress: resetProgress()
+    }));
 
-    setState((prev) => ({ ...prev, isSyncing: true }));
+    // Obtener período local
+    updateProgress({
+      status: "fetching",
+      message: "Obteniendo datos locales..."
+    });
+    
+    const periodoLocal = await handleGetPeriodoLocal();
 
     try {
       // 1. Obtener tickets locales
+      updateProgress({
+        status: "fetching",
+        message: "Obteniendo tickets locales..."
+      });
+      
       const localTickets = await ticketDb.getTickets();
       console.log("Tickets locales obtenidos:", localTickets.length);
       const localTicketsMap = new Map(localTickets.map((t) => [t.uuid4, t]));
@@ -746,6 +810,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       const fechaFin = dayjs().format("DD-MM-YYYY");
 
       // 2.1 Obtener el total de tickets del servidor
+      updateProgress({
+        status: "fetching",
+        message: "Obteniendo total de tickets..."
+      });
+
       const totalResponse = await ticketService.getTotalTicketsByDateRange(
         fechaInicio,
         fechaFin
@@ -759,6 +828,44 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       const pageSize = 600; // Tamaño de página fijo
       const totalPages = Math.ceil(totalTickets / pageSize);
 
+      // Calcular pesos relativos para cada etapa
+      const WEIGHTS = {
+        DOWNLOAD: 0.4,   // 40% para descarga
+        PROCESSING: 0.3, // 30% para procesamiento
+        UPLOAD: 0.3     // 30% para subida
+      };
+      
+      let currentProgress = 0;
+      
+      // Función para actualizar el progreso con peso
+      const updateWeightedProgress = (stage: 'DOWNLOAD' | 'PROCESSING' | 'UPLOAD', current: number, total: number, message: string) => {
+        const weight = WEIGHTS[stage];
+        const stageProgress = total > 0 ? (current / total) * weight : 0;
+        
+        // Calcular el progreso acumulado
+        let accumulated = 0;
+        if (stage === 'DOWNLOAD') {
+          accumulated = stageProgress;
+        } else if (stage === 'PROCESSING') {
+          accumulated = WEIGHTS.DOWNLOAD + stageProgress;
+        } else { // UPLOAD
+          accumulated = WEIGHTS.DOWNLOAD + WEIGHTS.PROCESSING + stageProgress;
+        }
+        
+        // Actualizar solo si hay un cambio significativo (más del 1%)
+        if (Math.abs(accumulated - currentProgress) >= 0.01 || current === 0 || current === total) {
+          currentProgress = accumulated;
+          updateProgress({
+            current: Math.round(currentProgress * 100),
+            total: 100,
+            message: message
+          });
+        }
+      };
+
+      // Actualizar progreso de descarga
+      updateWeightedProgress('DOWNLOAD', 0, totalPages, `Descargando datos (0/${totalPages} páginas)...`);
+
       // 2.2 Obtener todos los tickets paginados
       let serverTickets: any[] = [];
       for (let page = 1; page <= totalPages; page++) {
@@ -771,6 +878,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
         if (response.sms === "ok") {
           serverTickets = [...serverTickets, ...response.data.tickets];
+          updateWeightedProgress(
+            'DOWNLOAD', 
+            page, 
+            totalPages, 
+            `Descargando datos (${page}/${totalPages} páginas)...`
+          );
         }
       }
       if (!periodoLocal) {
@@ -788,6 +901,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       );
 
       // 3. Procesar sincronización
+      updateWeightedProgress('PROCESSING', 0, 1, "Procesando datos...");
+
       const ticketsToUpdate: Ticket[] = [];
       const ticketsToCreate: Ticket[] = [];
 
@@ -812,8 +927,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       }
 
       // 3.2. Marcar como pendientes los tickets locales que no están en el servidor
-      for (const [uuid, localTicket] of localTicketsMap.entries()) {
-        if (!serverTicketsMap.has(uuid)) {
+      for (const [uuid4, localTicket] of localTicketsMap.entries()) {
+        if (!serverTicketsMap.has(uuid4)) {
           ticketsToUpdate.push({
             ...localTicket,
             sync_pending: true,
@@ -822,24 +937,53 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       }
 
       // 4. Guardar cambios en la base de datos local
-      for (const ticket of [...ticketsToUpdate, ...ticketsToCreate]) {
+      const allTickets = [...ticketsToUpdate, ...ticketsToCreate];
+      const totalToProcess = allTickets.length;
+      
+      for (let i = 0; i < allTickets.length; i++) {
+        const ticket = allTickets[i];
+        if (!ticket.uuid4) {
+          console.warn("Ticket sin UUID, omitiendo:", ticket);
+          continue;
+        }
+        
         await ticketDb.saveTicket(ticket);
+        
+        // Actualizar progreso cada 10 tickets o en el último
+        if (i % 10 === 0 || i === totalToProcess - 1) {
+          updateWeightedProgress(
+            'PROCESSING',
+            i + 1,
+            totalToProcess,
+            `Procesando datos (${i + 1}/${totalToProcess})...`
+          );
+        }
       }
 
-      // 5. Actualizar estado y estadísticas
+      // 5. Sincronizar tickets pendientes
+      updateWeightedProgress('UPLOAD', 0, 1, "Actualizando lista de tickets...");
       await handleGetTickets();
-      // updateLocalStats();
-
-      // 6. Sincronizar tickets pendientes
       const pendingTickets = localTickets.filter((t) => t.sync_pending);
       const failedTickets: Ticket[] = [];
+      
+      if (pendingTickets.length === 0) {
+        updateWeightedProgress('UPLOAD', 1, 1, "No hay cambios pendientes por sincronizar");
+      }
 
-      for (const ticket of pendingTickets) {
-        if (ticket.uuid4 === undefined || !ticket.uuid4) {
-          console.warn("Ticket sin UUID, no se sincroniza:", ticket);
-          continue; // Saltar tickets sin UUID
-        }
+      // Procesar cada ticket pendiente
+      for (let i = 0; i < pendingTickets.length; i++) {
+        const ticket = pendingTickets[i];
+        const current = i + 1;
+        const total = pendingTickets.length;
+
         try {
+          updateWeightedProgress(
+            'UPLOAD',
+            current,
+            total,
+            `Sincronizando cambios (${current}/${total})...`
+          );
+
           const response = await ticketService.createTicket(ticket);
           if (response.sms === "ok" || response.code === "limitcomidauser") {
             await ticketDb.saveTicket({
@@ -859,43 +1003,158 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         }
       }
 
-      // 6.1 Eliminar tickets que estan sincronizados y el servidor no los tiene
       const syncedTickets = localTickets.filter(
         (t) => !t.sync_pending && !serverTicketsMap.has(t.uuid4)
       );
 
-      for (const ticket of syncedTickets) {
+      // 6.1 Create backup de los sincronizados, desde localTickets
+      const backupSyncedTickets = localTickets.filter((t) => t.sync_pending);
+
+      if (backupSyncedTickets.length > 0) {
         try {
-          await ticketDb.deleteTicketByUuid(ticket.uuid4);
-          console.log("Ticket eliminado:", ticket.uuid4);
+          // Create CSV content
+          let csvContent = "Codigo,Comida,Fecha\n";
+
+          // Get user map for better performance
+          const userMap = new Map(
+            state.usuariosNomina.map((user) => [user.pre_usuario_id, user])
+          );
+
+          // Add each ticket to CSV
+          for (const ticket of backupSyncedTickets) {
+            const user = userMap.get(ticket.pre_usuario_id);
+            const comida =
+              state.periodo?.pre_comidas_periodo?.find(
+                (cp: PreComidaPeriodo) =>
+                  cp.pre_comida_id === ticket.pre_comida_id
+              )?.pre_comidas?.nombre || "Comida no encontrada";
+
+            csvContent += `"${user?.code || ""}",`;
+            csvContent += `"${comida}",`;
+            csvContent += `"${dayjs(ticket.create_at).format("YYYY-MM-DD HH:mm:ss")}"\n`;
+          }
+
+          // Create filename with current date and time
+          const fileName = `backup_sincronizacion_${dayjs().format("YYYY-MM-DD_HH-mm-ss")}.csv`;
+          const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+
+          // Save file to external storage
+          try {
+            // Request permissions
+            const permissions =
+              await StorageAccessFramework.requestDirectoryPermissionsAsync();
+
+            if (permissions.granted) {
+              const uri = await StorageAccessFramework.createFileAsync(
+                permissions.directoryUri,
+                fileName,
+                "text/csv"
+              );
+              await FileSystem.writeAsStringAsync(uri, csvContent, {
+                encoding: FileSystem.EncodingType.UTF8,
+              });
+              console.log("Backup guardado en:", uri);
+              speak("Respaldo guardado en carpeta seleccionada");
+            } else {
+              speak("Permiso denegado para guardar archivo");
+            }
+            // if (Platform.OS === "android") {
+            //   const { status } = await MediaLibrary.requestPermissionsAsync();
+            //   if (status !== "granted") {
+            //     throw new Error(
+            //       "Se necesitan permisos de almacenamiento para guardar el archivo"
+            //     );
+            //   }
+            // }
+          } catch (error: any) {
+            console.error("Error al guardar el respaldo:", error);
+            speak("Error al guardar el respaldo. " + (error.message || ""));
+            // Write file
+            await FileSystem.writeAsStringAsync(fileUri, csvContent, {
+              encoding: FileSystem.EncodingType.UTF8,
+            });
+            console.log("Backup creado en:", fileUri);
+            // Share the file
+            if (await Sharing.isAvailableAsync()) {
+              Sharing.shareAsync(fileUri, {
+                mimeType: "text/csv",
+                dialogTitle: "Respaldo de tickets sincronizados",
+                UTI: "public.comma-separated-values-text",
+              });
+            }
+          }
         } catch (error) {
-          // console.error("Error al eliminar ticket:", error);
-          failedTickets.push(ticket);
-        } finally {
-          setState((prev) => ({ ...prev, isSyncing: false }));
+          console.log("Error al crear el respaldo:", error);
+          // Continue with deletion even if backup fails
+        }
+
+        // Delete the synced tickets after creating backup
+        for (const ticket of syncedTickets) {
+          try {
+            await ticketDb.deleteTicketByUuid(ticket.uuid4);
+            console.log("Ticket eliminado:", ticket.uuid4);
+          } catch (error) {
+            // console.error("Error al eliminar ticket:", error);
+            failedTickets.push(ticket);
+          } finally {
+            setState((prev) => ({ ...prev, isSyncing: false }));
+          }
         }
       }
 
       // 7. Notificar resultado
       if (failedTickets.length === 0) {
+        updateProgress({
+          status: "completed",
+          current: 100,
+          total: 100,
+          message: "Sincronización completada exitosamente"
+        });
         speak("Sincronización completada");
       } else {
-        speak(`Sincronización parcial. ${failedTickets.length} pendientes.`);
+        updateProgress({
+          status: "completed",
+          current: 100,
+          total: 100,
+          message: `Sincronización completada con ${failedTickets.length} errores`
+        });
+        speak(`Sincronización completada con ${failedTickets.length} errores`);
       }
     } catch (error) {
-      // console.error("Error en la sincronización:", error);
-      setErrorMessage(["Error al sincronizar"]);
+      const errorMsg = error instanceof Error ? error.message : "Error desconocido al sincronizar";
+      console.error("Error en la sincronización:", error);
+      setErrorMessage([errorMsg]);
       setShowError(true);
       speak("Error al sincronizar");
+      updateProgress({
+        status: "idle",
+        current: 0,
+        total: 100,
+        message: `Error: ${errorMsg.substring(0, 50)}${errorMsg.length > 50 ? '...' : ''}`
+      });
     } finally {
+      console.log("Sincronización finalizada");
       await AsyncStorage.setItem(LAST_SYNC_KEY, now.toString());
       setIsAppInitialized(true);
       await updateLocalStats();
+      
+      // Limpiar estados después de un tiempo
       setTimeout(() => {
         setShowError(false);
         setShowSuccess(false);
-      }, 800);
-      setState((prev) => ({ ...prev, isSyncing: false }));
+        
+        // Solo restablecer el progreso si no hay error
+        if (!state.errorMessage.length) {
+          setState(prev => ({
+            ...prev,
+            isSyncing: false,
+            syncProgress: {
+              ...prev.syncProgress,
+              status: "completed"
+            }
+          }));
+        }
+      }, 2000); // Aumentar el tiempo para que el usuario vea el mensaje final
     }
   };
 

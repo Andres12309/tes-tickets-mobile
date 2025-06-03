@@ -42,6 +42,8 @@ let api = axios.create({
 export const updateApiInstance = async (newUrl?: string) => {
   try {
     let baseURL = newUrl || await getApiUrl();
+
+    console.log("Actualizando instancia de API con URL:", baseURL);
     
     // Si se proporciona una nueva URL, actualizarla en AsyncStorage
     if (newUrl) {

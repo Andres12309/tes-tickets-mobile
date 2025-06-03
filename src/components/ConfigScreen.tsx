@@ -1,18 +1,57 @@
-import React, { useEffect, useState } from "react";
-import { Alert, Button, StyleSheet, Text, TextInput, View, ActivityIndicator, TouchableOpacity } from "react-native";
-import { updateApiInstance, getApiUrl } from "../services/api";
 import { MaterialIcons } from "@expo/vector-icons";
+import * as Updates from "expo-updates";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { getApiUrl, updateApiInstance } from "../services/api";
 
-const DEFAULT_API_URL = "https://tickets-api-production-bb7a.up.railway.app/api";
+const DEFAULT_API_URL =
+  "https://tickets-api-production-bb7a.up.railway.app/api";
 
 const ConfigScreen = ({ navigation }: { navigation: any }) => {
   const [apiUrl, setApiUrl] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
 
   useEffect(() => {
     loadConfig();
   }, []);
+
+  const handleUpdate = async () => {
+    if (__DEV__) return; // Solo en producción
+    if (!navigator.onLine) return; // Requiere conexión
+
+    try {
+      console.log("🔄 Verificando actualizaciones...");
+      const update = await Updates.checkForUpdateAsync();
+
+      if (update.isAvailable) {
+        console.log("⬇️ Descargando actualización...");
+        await Updates.fetchUpdateAsync();
+
+        Alert.alert(
+          "Actualización disponible",
+          "Se aplicará automáticamente en 5 segundos.",
+          [{ text: "OK" }]
+        );
+
+        setTimeout(() => {
+          Updates.reloadAsync();
+        }, 5000);
+      }
+    } catch (error: any) {
+      // console.warn("❌ Error al buscar actualizaciones:", error);
+      Alert.alert("Error", `No se pudo actualizar: ${error.message}`);
+    }
+  };
 
   const loadConfig = async () => {
     try {
@@ -42,8 +81,8 @@ const ConfigScreen = ({ navigation }: { navigation: any }) => {
         [
           {
             text: "Aceptar",
-            onPress: () => navigation.goBack()
-          }
+            onPress: () => navigation.goBack(),
+          },
         ]
       );
     } catch (error) {
@@ -65,8 +104,8 @@ const ConfigScreen = ({ navigation }: { navigation: any }) => {
         [
           {
             text: "Aceptar",
-            onPress: () => navigation.goBack()
-          }
+            onPress: () => navigation.goBack(),
+          },
         ]
       );
     } catch (error) {
@@ -88,7 +127,10 @@ const ConfigScreen = ({ navigation }: { navigation: any }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
           <MaterialIcons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
         <Text style={styles.title}>Configuración de la API</Text>
@@ -134,6 +176,22 @@ const ConfigScreen = ({ navigation }: { navigation: any }) => {
               Usar URL por Defecto
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, styles.updateButton]}
+            onPress={handleUpdate}
+            disabled={isCheckingUpdate}
+          >
+            {isCheckingUpdate ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <View style={styles.updateButtonContent}>
+                <MaterialIcons name="system-update" size={20} color="#fff" />
+                <Text style={[styles.buttonText, { marginLeft: 8 }]}>
+                  Buscar Actualización
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -146,17 +204,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#f5f5f5",
   },
   centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: "#e0e0e0",
   },
   backButton: {
     padding: 8,
@@ -166,8 +224,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
   },
   content: {
     flex: 1,
@@ -175,23 +233,23 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
+    fontWeight: "500",
+    color: "#333",
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
     fontSize: 16,
-    color: '#333',
+    color: "#333",
   },
   helperText: {
     fontSize: 13,
-    color: '#666',
+    color: "#666",
     marginBottom: 20,
   },
   buttonContainer: {
@@ -200,25 +258,32 @@ const styles = StyleSheet.create({
   button: {
     padding: 15,
     borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 12,
   },
   saveButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
   },
   resetButton: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: "#007AFF",
   },
   buttonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   resetButtonText: {
-    color: '#007AFF',
+    color: "#007AFF",
+  },
+  updateButton: {
+    backgroundColor: "#28a745",
+  },
+  updateButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
   },
 });
 
