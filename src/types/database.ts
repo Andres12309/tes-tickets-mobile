@@ -61,3 +61,16 @@ export interface Comida {
   hora_fin: string;
   estado: boolean;
 }
+
+export interface TicketWithUser extends Omit<Ticket, 'pre_usuario_id' | 'pre_comida_id' | 'estado' | 'create_at' | 'sync_pending'> {
+  nombres?: string;
+  apellidos?: string;
+  code?: string;
+  create_at?: string;
+  sync_pending?: boolean;
+  pre_usuario_id?: number;
+  pre_comida_id?: number;
+  periodo_id?: number;
+  estado?: number;
+  sync_at?: string | null;
+}

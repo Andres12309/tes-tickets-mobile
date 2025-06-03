@@ -99,11 +99,11 @@ export default function TicketsScreen() {
           </Text>
           <Text style={styles.ticketDate}>
             {item.create_at
-              ? new Date(item.create_at).toLocaleString()
+              ? `${new Date(item.create_at).toLocaleString()}`
               : "Fecha no disponible"}
           </Text>
           <Text style={styles.ticketComida}>
-            {item.comida || "Comida no especificada"}
+            {`${item.comida || "Comida no especificada"}`}
           </Text>
           {item.sync_pending ? (
             <Text style={styles.syncPendingText}>Pendiente de sincronizar</Text>
@@ -125,23 +125,26 @@ export default function TicketsScreen() {
 
   // Filter tickets based on search criteria and sync status
   const filteredTickets = useMemo(() => {
-    return localTickets.filter(ticket => {
-      const matchesCode = !searchCode || 
-        (ticket.code && ticket.code.toLowerCase().includes(searchCode.toLowerCase()));
-      
-      const fullName = `${ticket.nombres || ''} ${ticket.apellidos || ''}`.toLowerCase();
-      const matchesName = !searchName || 
-        fullName.includes(searchName.toLowerCase());
-      
+    return localTickets.filter((ticket) => {
+      const matchesCode =
+        !searchCode ||
+        (ticket.code &&
+          ticket.code.toLowerCase().includes(searchCode.toLowerCase()));
+
+      const fullName =
+        `${ticket.nombres || ""} ${ticket.apellidos || ""}`.toLowerCase();
+      const matchesName =
+        !searchName || fullName.includes(searchName.toLowerCase());
+
       const matchesSyncStatus = !showPendingOnly || ticket.sync_pending;
-      
+
       return matchesCode && matchesName && matchesSyncStatus;
     });
   }, [localTickets, searchCode, searchName, showPendingOnly]);
 
   const clearFilters = () => {
-    setSearchCode('');
-    setSearchName('');
+    setSearchCode("");
+    setSearchName("");
     setShowPendingOnly(false);
   };
 
@@ -149,12 +152,17 @@ export default function TicketsScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.contentContainer}>
         <Text style={styles.title}>Tickets Registrados</Text>
-        
+
         {/* Search Filters */}
         <View style={styles.searchSection}>
           <View style={styles.searchContainer}>
             <View style={styles.searchInputContainer}>
-              <MaterialIcons name="search" size={20} color="#6c757d" style={styles.searchIcon} />
+              <MaterialIcons
+                name="search"
+                size={20}
+                color="#6c757d"
+                style={styles.searchIcon}
+              />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Buscar por código..."
@@ -163,14 +171,22 @@ export default function TicketsScreen() {
                 placeholderTextColor="#6c757d"
               />
               {searchCode ? (
-                <TouchableOpacity onPress={() => setSearchCode('')} style={styles.clearButton}>
+                <TouchableOpacity
+                  onPress={() => setSearchCode("")}
+                  style={styles.clearButton}
+                >
                   <MaterialIcons name="close" size={18} color="#6c757d" />
                 </TouchableOpacity>
               ) : null}
             </View>
-            
+
             <View style={[styles.searchInputContainer, { marginTop: 8 }]}>
-              <MaterialIcons name="person-search" size={20} color="#6c757d" style={styles.searchIcon} />
+              <MaterialIcons
+                name="person-search"
+                size={20}
+                color="#6c757d"
+                style={styles.searchIcon}
+              />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Buscar por nombre..."
@@ -179,37 +195,48 @@ export default function TicketsScreen() {
                 placeholderTextColor="#6c757d"
               />
               {searchName ? (
-                <TouchableOpacity onPress={() => setSearchName('')} style={styles.clearButton}>
+                <TouchableOpacity
+                  onPress={() => setSearchName("")}
+                  style={styles.clearButton}
+                >
                   <MaterialIcons name="close" size={18} color="#6c757d" />
                 </TouchableOpacity>
               ) : null}
             </View>
-            
+
             <View style={styles.filtersRow}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setShowPendingOnly(!showPendingOnly)}
-                style={[styles.filterButton, showPendingOnly && styles.filterButtonActive]}
+                style={[
+                  styles.filterButton,
+                  showPendingOnly && styles.filterButtonActive,
+                ]}
               >
-                <MaterialIcons 
-                  name={showPendingOnly ? "sync-problem" : "sync"} 
-                  size={18} 
-                  color={showPendingOnly ? "#fff" : "#4dabf7"} 
+                <MaterialIcons
+                  name={showPendingOnly ? "sync-problem" : "sync"}
+                  size={18}
+                  color={showPendingOnly ? "#fff" : "#4dabf7"}
                 />
-                <Text style={[styles.filterButtonText, showPendingOnly && styles.filterButtonTextActive]}>
+                <Text
+                  style={[
+                    styles.filterButtonText,
+                    showPendingOnly && styles.filterButtonTextActive,
+                  ]}
+                >
                   {showPendingOnly ? "Ocultar pendientes" : "Ver pendientes"}
                 </Text>
                 {showPendingOnly && (
                   <View style={styles.pendingBadge}>
                     <Text style={styles.pendingBadgeText}>
-                      {localTickets.filter(t => t.sync_pending).length}
+                      {localTickets.filter((t) => t.sync_pending).length}
                     </Text>
                   </View>
                 )}
               </TouchableOpacity>
-              
+
               {(searchCode || searchName || showPendingOnly) && (
-                <TouchableOpacity 
-                  onPress={clearFilters} 
+                <TouchableOpacity
+                  onPress={clearFilters}
                   style={[styles.clearAllButton, { marginLeft: 8 }]}
                 >
                   <Text style={styles.clearAllText}>Limpiar filtros</Text>
@@ -218,14 +245,15 @@ export default function TicketsScreen() {
             </View>
           </View>
         </View>
-        
+
         {/* Results count */}
         <View style={styles.resultsContainer}>
           <Text style={styles.resultsCount}>
-            {filteredTickets.length} {filteredTickets.length === 1 ? 'resultado' : 'resultados'}
+            {filteredTickets.length}{" "}
+            {filteredTickets.length === 1 ? "resultado" : "resultados"}
           </Text>
         </View>
-        
+
         {filteredTickets.length > 0 ? (
           <FlatList
             data={filteredTickets}
@@ -238,7 +266,10 @@ export default function TicketsScreen() {
             <MaterialIcons name="search-off" size={48} color="#adb5bd" />
             <Text style={styles.emptyText}>No se encontraron tickets</Text>
             {(searchCode || searchName) && (
-              <TouchableOpacity onPress={clearFilters} style={styles.tryAgainButton}>
+              <TouchableOpacity
+                onPress={clearFilters}
+                style={styles.tryAgainButton}
+              >
                 <Text style={styles.tryAgainText}>Limpiar búsqueda</Text>
               </TouchableOpacity>
             )}
@@ -271,15 +302,15 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
     borderRadius: 8,
     paddingHorizontal: 12,
     height: 48,
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: "#000",
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
         shadowRadius: 2,
@@ -294,71 +325,71 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    height: '100%',
+    height: "100%",
     fontSize: 16,
-    color: '#212529',
+    color: "#212529",
   },
   clearButton: {
     padding: 4,
   },
   filtersRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 12,
-    flexWrap: 'wrap',
+    flexWrap: "wrap",
   },
   filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#4dabf7',
-    backgroundColor: '#fff',
+    borderColor: "#4dabf7",
+    backgroundColor: "#fff",
   },
   filterButtonActive: {
-    backgroundColor: '#4dabf7',
+    backgroundColor: "#4dabf7",
   },
   filterButtonText: {
     marginLeft: 6,
-    color: '#4dabf7',
+    color: "#4dabf7",
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   filterButtonTextActive: {
-    color: '#fff',
+    color: "#fff",
   },
   pendingBadge: {
     marginLeft: 6,
-    backgroundColor: '#ff6b6b',
+    backgroundColor: "#ff6b6b",
     borderRadius: 10,
     minWidth: 20,
     height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   pendingBadgeText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   clearAllButton: {
     padding: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#dee2e6',
+    borderColor: "#dee2e6",
   },
   clearAllText: {
-    color: '#6c757d',
+    color: "#6c757d",
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   resultsContainer: {
     marginBottom: 12,
   },
   resultsCount: {
-    color: '#6c757d',
+    color: "#6c757d",
     fontSize: 14,
   },
   listContainer: {
@@ -409,15 +440,15 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 32,
   },
   emptyText: {
     fontSize: 16,
     color: "#6c757d",
     marginTop: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
   syncPendingText: {
     color: "#ff6b6b",
@@ -427,12 +458,12 @@ const styles = StyleSheet.create({
   tryAgainButton: {
     marginTop: 16,
     padding: 12,
-    backgroundColor: '#f1f3f5',
+    backgroundColor: "#f1f3f5",
     borderRadius: 8,
   },
   tryAgainText: {
-    color: '#4dabf7',
-    fontWeight: '500',
+    color: "#4dabf7",
+    fontWeight: "500",
   },
   syncedText: {
     color: "#51cf66",

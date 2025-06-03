@@ -130,8 +130,8 @@ type AppContextType = AppState & {
   setShowError: (show: boolean) => void;
   setShowSuccess: (show: boolean) => void;
   setLoading: (loading: boolean) => void;
-  handleGetPeriodo: () => Promise<void>;
-  handleGetNomina: () => Promise<void>;
+  handleGetPeriodo: (forceLocal: boolean) => Promise<void>;
+  handleGetNomina: (forceLocal: boolean) => Promise<void>;
   handleGetTickets: () => Promise<void>;
   handleCrearTicket: (userCode: string) => Promise<void>;
   syncTickets: (force: boolean) => Promise<void>;
@@ -189,13 +189,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         // 2. Cargar datos locales primero para una experiencia más rápida
         await handleGetNomina(true); // Forzar carga local primero
         await handleGetPeriodo(true); // Forzar carga local primero
+        await handleGetTickets(true); // Cargar tickets locales
 
         // 3. Si hay conexión, sincronizar con el servidor
         // if (state.isOnline && appState === "active") {
         //   await syncTickets();
         // }
 
-        console.log("Datos iniciales cargados correctamente");
         // Marcar la aplicación como inicializada
         setIsAppInitialized(true);
       } catch (error) {
@@ -213,7 +213,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
     setLoading(true);
     initializeApp();
-  }, []);
+  }, [state.isOnline]);
 
   // Socket
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -309,7 +309,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [state.isOnline]);
 
   // Refrescar updateLocalStats
   useEffect(() => {
@@ -435,6 +435,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     } finally {
       await updateLocalStats();
       setLoading(false);
+      setTimeout(() => {
+        setState((prev) => ({
+          ...prev,
+          showError: false,
+          showSuccess: false,
+        }));
+      }, 800);
     }
   };
 
@@ -592,7 +599,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         showError: true,
       }));
     } finally {
-      setLoading(false);
+      setTimeout(() => {
+        setState((prev) => ({
+          ...prev,
+          showError: false,
+          showSuccess: false,
+          loading: false,
+        }));
+      }, 800);
     }
   };
 
@@ -628,12 +642,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
           );
         }
       }
-      console.log("Usuarios obtenidos del servidor:", users.length);
-
       // 2. Cargar usuarios de la base de datos local
       const localUsers = await userDb.getAllUsers();
 
-      console.log("Usuarios locales obtenidos:", localUsers.length);
       if (localUsers && localUsers.length > 0) {
         setUsuariosNomina(localUsers);
       } else if (users.length > 0) {
@@ -650,7 +661,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         showError: true,
       }));
     } finally {
-      setLoading(false);
+      setTimeout(() => {
+        setState((prev) => ({
+          ...prev,
+          showError: false,
+          showSuccess: false,
+          loading: false,
+        }));
+      }, 800);
     }
   };
 
@@ -830,12 +848,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
               pre_ticket_id: response.data?.pre_ticket_id || 0,
             });
           } else {
-            console.log("Error al sincronizar ticket:", response);
+            // console.log("Error al sincronizar ticket:", response);
             failedTickets.push(ticket);
           }
         } catch (error) {
           // console.error("Error al sincronizar ticket:", error);
           failedTickets.push(ticket);
+        } finally {
+          setState((prev) => ({ ...prev, isSyncing: false }));
         }
       }
 
@@ -851,6 +871,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         } catch (error) {
           // console.error("Error al eliminar ticket:", error);
           failedTickets.push(ticket);
+        } finally {
+          setState((prev) => ({ ...prev, isSyncing: false }));
         }
       }
 
@@ -885,19 +907,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         ...ticketData,
         sync_pending: true, // Siempre marcar como pendiente
       });
-      await handleGetTickets();
 
       if (saveResult.isNew) {
         setUser(user);
         setShowSuccess(true);
         speak("Pedido exitoso");
 
-        if (socket?.connected) {
-          socket.emit("ticket:update", {
-            sala: "ticketsEmitidos",
-            data: ticketData,
-          });
-        }
+        // if (socket?.connected) {
+        //   socket.emit("ticket:update", {
+        //     sala: "ticketsEmitidos",
+        //     data: ticketData,
+        //   });
+        // }
 
         // Actualizar lista de tickets y estadísticas
       }
@@ -905,12 +926,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       // console.error("Error al guardar el ticket:", error);
       setErrorMessage(["Error al guardar el pedido"]);
       setShowError(true);
-    } finally {
-      setTimeout(() => {
-        setShowError(false);
-        setShowSuccess(false);
-        setErrorMessage([]);
-      }, 800);
     }
   };
 
@@ -935,6 +950,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         showError: true,
       }));
       speak("Por favor ingrese un código");
+      setTimeout(() => {
+        setState((prev) => ({
+          ...prev,
+          errorMessage: [],
+          showError: false,
+        }));
+      }, 1000);
       return;
     }
 
@@ -944,7 +966,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         errorMessage: ["No hay un período activo"],
         showError: true,
       }));
-      speak("No hay período activo");
+      speak("No hay período activo, Sincronice...");
+      setTimeout(() => {
+        setState((prev) => ({
+          ...prev,
+          errorMessage: [],
+          showError: false,
+        }));
+      }, 1000);
       return;
     }
 
@@ -965,6 +994,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       const user = state.usuariosNomina.find(
         (data: User) => `${data.code}` === `${userCode}`
       );
+
+      if (state.usuariosNomina.length === 0) {
+        speak("No hay usuarios en la nómina, Sincronice...");
+        setState((prev) => ({
+          ...prev,
+          errorMessage: ["No hay usuarios en la nómina"],
+          showError: true,
+        }));
+        setTimeout(() => {
+          setState((prev) => ({
+            ...prev,
+            user: null,
+            showSuccess: false,
+            errorMessage: [],
+            loading: false,
+          }));
+        }, 1000);
+        return;
+      }
 
       if (!user) {
         speak("Error en el código");
@@ -1056,13 +1104,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         loading: false,
       }));
     } finally {
-      await handleGetTickets();
+      await handleGetTickets(true);
       setTimeout(() => {
         setShowError(false);
         setState((prev) => ({
           ...prev,
           user: null,
           showSuccess: false,
+          loading: false,
         }));
       }, 500);
     }

@@ -1,22 +1,80 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 
+const CONFIG_KEY = "@app_config";
+const DEFAULT_API_URL = "https://tickets-api-production-bb7a.up.railway.app/api";
+
+// Función para obtener la URL de la API
+export const getApiUrl = async (): Promise<string> => {
+  try {
+    const config = await AsyncStorage.getItem(CONFIG_KEY);
+    if (config) {
+      const { apiUrl } = JSON.parse(config);
+      return apiUrl || DEFAULT_API_URL;
+    }
+  } catch (error) {
+    console.error("Error al obtener la URL de la API:", error);
+  }
+  return DEFAULT_API_URL;
+};
+
 // Configuración base de axios
-const api = axios.create({
-  baseURL: "https://tickets-api-production-bb7a.up.railway.app/api", // Ajusta esta URL según tu configuración
+const createApiInstance = async () => {
+  const baseURL = await getApiUrl();
+  return axios.create({
+    baseURL,
+    timeout: 10000,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+};
+
+let api = axios.create({
+  baseURL: DEFAULT_API_URL,
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Interceptor para manejar errores globalmente
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    console.error("Error en la petición:", error);
-    return Promise.reject(error);
+// Actualizar la instancia de axios con la URL correcta
+export const updateApiInstance = async (newUrl?: string) => {
+  try {
+    let baseURL = newUrl || await getApiUrl();
+    
+    // Si se proporciona una nueva URL, actualizarla en AsyncStorage
+    if (newUrl) {
+      await AsyncStorage.setItem(CONFIG_KEY, JSON.stringify({ apiUrl: newUrl }));
+    }
+    
+    // Crear nueva instancia de axios
+    api = axios.create({
+      baseURL,
+      timeout: 10000,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+    
+    // Configurar interceptores
+    api.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        console.error("Error en la petición:", error);
+        return Promise.reject(error);
+      }
+    );
+    
+    return api;
+  } catch (error) {
+    console.error("Error al actualizar la instancia de la API:", error);
+    throw error;
   }
-);
+};
+
+// Inicializar con la URL guardada
+updateApiInstance();
 
 // Servicios de Tickets
 export const ticketService = {
@@ -99,7 +157,11 @@ export const periodoService = {
 // Servicios de Usuarios
 export const usuarioService = {
   // Obtener todos los usuarios
-  getAllUsers: async (page: number = 1, pageSize: number = 200, status: true) => {
+  getAllUsers: async (
+    page: number = 1,
+    pageSize: number = 200,
+    status: true
+  ) => {
     try {
       const response = await api.get(
         `/GETallUsers?page=${page}&pageSize=${pageSize}&estado=${status}`

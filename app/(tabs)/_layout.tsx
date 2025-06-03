@@ -1,5 +1,5 @@
 import { AppProvider } from "@/src/contexts/AppContext";
-import { Tabs } from "expo-router";
+import { Tabs, useNavigation } from "expo-router";
 import * as Updates from "expo-updates";
 import { useEffect } from "react";
 import { Alert } from "react-native";
@@ -42,9 +42,16 @@ export default function TabLayout() {
     return () => clearInterval(interval);
   }, []);
 
+  const navigation = useNavigation();
+
   return (
     <AppProvider>
-      <Tabs screenOptions={{ headerShown: false }} initialRouteName="index">
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+        }}
+        initialRouteName="index"
+      >
         <Tabs.Screen
           name="index"
           options={{
@@ -62,6 +69,15 @@ export default function TabLayout() {
             tabBarLabel: "Tickets Marcados",
             tabBarIcon: ({ color }) => (
               <Icon name="check-circle" size={24} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="config"
+          options={{
+            headerShown: false,
+            tabBarIcon: ({ color }) => (
+              <Icon name="cog" size={24} color={color} />
             ),
           }}
         />

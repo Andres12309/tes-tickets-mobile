@@ -4,6 +4,7 @@ import * as Haptics from "expo-haptics";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
   Platform,
   StyleSheet,
   Text,
@@ -13,12 +14,15 @@ import {
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { useAppContext } from "../contexts/AppContext";
+import { ticketDb } from "../services/database";
+import { TicketWithUser } from "../types/database";
 import LoadingAnimado from "./LoadingAnimado";
 import SyncButton from "./SyncButton";
 
 const TicketsScreen = () => {
   const {
     user,
+    usuariosNomina,
     periodo,
     isOnline,
     loading,
@@ -31,9 +35,13 @@ const TicketsScreen = () => {
     preComidaActual,
     isAppInitialized,
   } = useAppContext();
+
   const inputRef = useRef(null);
   const [code, setCode] = useState<string>("");
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
+
+  const [showRecentTickets, setShowRecentTickets] = useState(false);
+  const [recentTickets, setRecentTickets] = useState<TicketWithUser[]>([]);
 
   // Efecto para manejar el enfoque de la pantalla
   useFocusEffect(
@@ -42,7 +50,7 @@ const TicketsScreen = () => {
       setCode("");
 
       // Recargar el período actual
-      handleGetPeriodo();
+      // handleGetPeriodo();
 
       // Establecer como inicializado después del primer render
       if (!isInitialized) {
@@ -64,6 +72,20 @@ const TicketsScreen = () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   }, [showSuccess]);
+
+  const loadRecentTickets = async () => {
+    try {
+      const tickets = await ticketDb.getRecentTickets(10);
+      setRecentTickets(tickets as TicketWithUser[]);
+    } catch (error) {
+      // console.log("Error al cargar tickets recientes:", error);
+      setRecentTickets([]);
+    }
+  };
+
+  useEffect(() => {
+    loadRecentTickets();
+  }, [code]);
 
   // Función para manejar la entrada de teclado numérico
   const handleKeyPress = (value: string) => {
@@ -158,7 +180,7 @@ const TicketsScreen = () => {
     if (!periodo) {
       return (
         <View style={styles.periodoContainer}>
-          <Text style={styles.periodoText}>Cargando período...</Text>
+          <Text style={styles.periodoText}>Sin período! </Text>
         </View>
       );
     }
@@ -200,14 +222,67 @@ const TicketsScreen = () => {
         autoFocus
         onChangeText={(text) => {
           const partes = text.trim().split(/\s+/);
-          const extractedCode = partes[1];
+          let extractedCode = partes[1];
 
           if (extractedCode) {
+            // Elimina ceros iniciales, pero conserva letras (ej. "P001" → "P1")
+            if (/^\d+$/.test(extractedCode)) {
+              extractedCode = extractedCode.replace(/^0+/, "");
+            }
+
             handleCrearTicket(extractedCode);
           } else {
             setCode(text);
           }
         }}
+      />
+    </View>
+  );
+
+  const toggleRecentTickets = () => {
+    setShowRecentTickets(!showRecentTickets);
+  };
+
+  // Renderizar el listado de tickets recientes
+  const renderRecentTickets = () => (
+    <View style={styles.recentTicketsContainer}>
+      <View style={styles.recentTicketsHeader}>
+        <Text style={styles.recentTicketsTitle}>Recientes</Text>
+        <TouchableOpacity
+          onPress={toggleRecentTickets}
+          style={styles.closeButton}
+        >
+          <MaterialIcons name="close" size={24} color="#6c757d" />
+        </TouchableOpacity>
+      </View>
+      <FlatList
+        data={recentTickets}
+        keyExtractor={(item) => item.uuid4}
+        renderItem={({ item }) => (
+          <View style={styles.recentTicketItem}>
+            <View style={styles.recentTicketIcon}>
+              <MaterialIcons
+                name="confirmation-number"
+                size={20}
+                color="#4dabf7"
+              />
+            </View>
+            <View style={styles.recentTicketInfo}>
+              <Text style={styles.recentTicketCode}>
+                {item.code || "Sin código"}
+              </Text>
+              <Text style={styles.recentTicketName}>
+                {item.nombres || "Usuario"} {item.apellidos || ""}
+              </Text>
+              <Text style={styles.recentTicketTime}>
+                {item.create_at
+                  ? new Date(item.create_at).toLocaleTimeString()
+                  : ""}
+              </Text>
+            </View>
+          </View>
+        )}
+        contentContainerStyle={styles.recentTicketsList}
       />
     </View>
   );
@@ -231,11 +306,22 @@ const TicketsScreen = () => {
     <View style={styles.container}>
       {/* Encabezado */}
       <View style={styles.header}>
-        <Text style={styles.title}>Tickets</Text>
+        <View style={styles.titleWithCounter}>
+          <Text style={styles.title}>Tickets</Text>
+          <View style={styles.ticketCounter}>
+            <Text style={styles.ticketCounterText}>{recentTickets.length}</Text>
+          </View>
+        </View>
         <View style={styles.syncGroup}>
           <TouchableOpacity
+            onPress={toggleRecentTickets}
+            style={styles.showRecentButton}
+          >
+            <MaterialIcons name="history" size={24} color="#4dabf7" />
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.syncButton, loading && styles.syncButtonDisabled]}
-            onPress={handleGetPeriodo}
+            onPress={() => handleGetPeriodo(false)}
             disabled={loading}
           >
             <Text style={styles.statusText}>
@@ -245,12 +331,12 @@ const TicketsScreen = () => {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.syncButton, loading && styles.syncButtonDisabled]}
-            onPress={handleGetNomina}
+            onPress={() => handleGetNomina(false)}
             disabled={loading}
           >
             <Text style={styles.statusText}>
               <Icon name="sync" size={15} color="#fff" />
-              Nómina
+              Nómina {usuariosNomina.length}
             </Text>
           </TouchableOpacity>
           {renderConnectionStatus()}
@@ -266,7 +352,6 @@ const TicketsScreen = () => {
           alignContent: "space-between",
           padding: 2,
           marginBottom: 10,
-          marginTop: "auto",
           width: "100%",
         }}
       >
@@ -282,7 +367,8 @@ const TicketsScreen = () => {
         {renderCodeInput()}
 
         {/* Teclado numérico */}
-        {renderNumericKeypad()}
+        {showRecentTickets && renderRecentTickets()}
+        {!showRecentTickets && renderNumericKeypad()}
       </View>
 
       {/* Mensaje de éxito */}
@@ -341,6 +427,32 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#212529",
   },
+  titleWithCounter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  ticketCounter: {
+    backgroundColor: "#ff6b6b",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    minWidth: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+
+  ticketCounterText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
   statusContainer: {
     paddingVertical: 6,
     paddingHorizontal: 12,
@@ -362,14 +474,6 @@ const styles = StyleSheet.create({
   },
   periodoTime: {
     fontSize: 16,
-    color: "#495057",
-  },
-  counterContainer: {
-    alignItems: "center",
-    marginBottom: 32,
-  },
-  counterText: {
-    fontSize: 18,
     color: "#495057",
   },
   codeContainer: {
@@ -440,7 +544,8 @@ const styles = StyleSheet.create({
     }),
   },
   keyText: {
-    fontSize: 28,
+    fontSize: 22,
+    fontWeight: "600",
     color: "#212529",
   },
   loadingContainer: {
@@ -490,7 +595,7 @@ const styles = StyleSheet.create({
   },
   syncButton: {
     backgroundColor: "grey",
-    width: 80,
+    maxWidth: 120,
     height: 30,
     borderRadius: 25,
     justifyContent: "center",
@@ -499,6 +604,65 @@ const styles = StyleSheet.create({
   },
   syncButtonDisabled: {
     backgroundColor: "#90CAF9",
+  },
+  // Recent tickets styles
+  recentTicketsContainer: {
+    marginTop: 10,
+    display: "flex",
+    justifyContent: "center",
+    alignSelf: "center",
+    width: "100%",
+    height: 450,
+  },
+  recentTicketsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  recentTicketsTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#495057",
+  },
+  closeButton: {
+    padding: 5,
+  },
+  recentTicketsList: {
+    padding: 10,
+  },
+  recentTicketItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e9ecef",
+  },
+  recentTicketIcon: {
+    marginRight: 10,
+  },
+  recentTicketInfo: {
+    flex: 1,
+  },
+  recentTicketCode: {
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  recentTicketName: {
+    fontSize: 14,
+    color: "#6c757d",
+  },
+  recentTicketTime: {
+    fontSize: 12,
+    color: "#adb5bd",
+  },
+  showRecentButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 8,
+    backgroundColor: "#f1f3f5",
+    borderRadius: 20,
+    marginLeft: 10,
   },
 });
 
