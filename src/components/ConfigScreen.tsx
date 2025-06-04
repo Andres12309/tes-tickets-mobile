@@ -1,4 +1,5 @@
 import { MaterialIcons } from "@expo/vector-icons";
+import NetInfo from '@react-native-community/netinfo';
 import * as Updates from "expo-updates";
 import React, { useEffect, useState } from "react";
 import {
@@ -11,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { getApiUrl, updateApiInstance } from "../services/api";
+
 
 const DEFAULT_API_URL =
   "https://tickets-api-production-bb7a.up.railway.app/api";
@@ -26,30 +28,52 @@ const ConfigScreen = ({ navigation }: { navigation: any }) => {
   }, []);
 
   const handleUpdate = async () => {
-    if (__DEV__) return; // Solo en producción
-    if (!navigator.onLine) return; // Requiere conexión
+    // Mensaje claro en desarrollo
+    if (__DEV__) {
+      Alert.alert(
+        "Modo desarrollo",
+        "Las actualizaciones OTA solo funcionan en producción."
+      );
+      return;
+    }
 
+    // Verificar conexión correctamente
+    const state = await NetInfo.fetch();
+    if (!state.isConnected) {
+      Alert.alert(
+        "Sin conexión",
+        "Necesitas internet para buscar actualizaciones"
+      );
+      return;
+    }
+
+    setIsCheckingUpdate(true);
     try {
-      console.log("🔄 Verificando actualizaciones...");
       const update = await Updates.checkForUpdateAsync();
 
       if (update.isAvailable) {
-        console.log("⬇️ Descargando actualización...");
-        await Updates.fetchUpdateAsync();
-
         Alert.alert(
           "Actualización disponible",
-          "Se aplicará automáticamente en 5 segundos.",
-          [{ text: "OK" }]
+          "¿Descargar e instalar ahora?",
+          [
+            { text: "Cancelar", style: "cancel" },
+            {
+              text: "Instalar",
+              onPress: async () => {
+                await Updates.fetchUpdateAsync();
+                Updates.reloadAsync();
+              },
+            },
+          ]
         );
-
-        setTimeout(() => {
-          Updates.reloadAsync();
-        }, 5000);
+      } else {
+        Alert.alert("¡Todo actualizado!", "Tienes la última versión de la app");
       }
     } catch (error: any) {
-      // console.warn("❌ Error al buscar actualizaciones:", error);
-      Alert.alert("Error", `No se pudo actualizar: ${error.message}`);
+      Alert.alert("Error", `Falló la actualización: ${error.message}`);
+      console.error("Actualización OTA:", error);
+    } finally {
+      setIsCheckingUpdate(false);
     }
   };
 
@@ -178,7 +202,7 @@ const ConfigScreen = ({ navigation }: { navigation: any }) => {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.updateButton]}
-            onPress={handleUpdate}
+            onPress={() => handleUpdate()}
             disabled={isCheckingUpdate}
           >
             {isCheckingUpdate ? (

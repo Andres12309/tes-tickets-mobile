@@ -3,7 +3,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Platform,
   StyleSheet,
@@ -21,8 +20,8 @@ import LoadingAnimado from "./LoadingAnimado";
 import SyncButton from "./SyncButton";
 
 // Get the app version from app.json
-const appVersion = appConfig.expo.version || '1.0.2';
-const appRutineVersion = appConfig.expo.runtimeVersion.policy || '1.0.0';
+const appVersion = appConfig.expo.version || "1.0.2";
+const appRutineVersion = appConfig.expo.runtimeVersion.policy || "1.0.0";
 
 const TicketsScreen = () => {
   const {
@@ -91,7 +90,7 @@ const TicketsScreen = () => {
 
   useEffect(() => {
     loadRecentTickets();
-  }, [code]);
+  }, [code, showSuccess]);
 
   // Función para manejar la entrada de teclado numérico
   const handleKeyPress = (value: string) => {
@@ -193,9 +192,24 @@ const TicketsScreen = () => {
 
     return (
       <View style={styles.periodoContainer}>
-        <Text style={styles.periodoText}>
-          {preComidaActual?.nombre || "Período actual"}
-        </Text>
+        {preComidaActual?.nombre ? (
+          <Text style={styles.periodoText}>{preComidaActual?.nombre}</Text>
+        ) : (
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: "bold",
+              color: "#dc3545",
+              textAlign: "center",
+              padding: 5,
+              backgroundColor: "#f8d7da",
+              borderRadius: 8,
+              elevation: 5,
+            }}
+          >
+            No es hora de comida
+          </Text>
+        )}
         <Text style={styles.periodoTime}>
           {preComidaActual?.hora_inicio} - {preComidaActual?.hora_fin}
         </Text>
@@ -231,7 +245,6 @@ const TicketsScreen = () => {
           let extractedCode = partes[1];
 
           if (extractedCode) {
-            // Elimina ceros iniciales, pero conserva letras (ej. "P001" → "P1")
             if (/^\d+$/.test(extractedCode)) {
               extractedCode = extractedCode.replace(/^0+/, "");
             }
@@ -293,19 +306,24 @@ const TicketsScreen = () => {
     </View>
   );
 
-  // Renderizar indicador de carga
+  // Cargando minetras se obtiene la información
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4dabf7" />
-        <Text style={styles.loadingText}>Procesando...</Text>
-      </View>
+      <LoadingAnimado
+        message="Sincronizando..."
+        tip="💡 Consejo: ¡Ten tu código listo para agilizar el ingreso!"
+      />
     );
   }
 
   // Mostrar un loading mientras se inicializa la app
   if (!isAppInitialized) {
-    return <LoadingAnimado />;
+    return (
+      <LoadingAnimado
+        message="Inicializando aplicación..."
+        tip="💡 Consejo: ¡Ten tu código listo para agilizar el ingreso!"
+      />
+    );
   }
 
   return (
@@ -672,10 +690,10 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   versionText: {
-    position: 'absolute',
+    position: "absolute",
     top: 5,
     right: 10,
-    color: '#666',
+    color: "#666",
     fontSize: 12,
   },
 });

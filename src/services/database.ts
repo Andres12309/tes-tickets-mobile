@@ -38,7 +38,7 @@ export const getDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
       }
 
       db = await SQLite.openDatabaseAsync("tickets.db");
-      
+
       console.log("Database connection established");
       isInitializing = false;
       resolve(db);
@@ -174,9 +174,9 @@ const userDb = {
         [
           user.pre_usuario_id,
           user.code,
-          user.nombres,
-          user.apellidos,
-          user.fecha_naci || null,
+          user.nombres || "",
+          user.apellidos || "",
+          user.fecha_naci || "",
           user.sync ? 1 : 0,
           user.sync_pending ? 1 : 0,
         ]

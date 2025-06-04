@@ -2,7 +2,12 @@ import { MaterialIcons } from "@expo/vector-icons";
 import React, { useEffect, useRef } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 
-const LoadingAnimado = () => {
+interface LoadingAnimadoProps {
+  message?: string;
+  tip?: string;
+}
+
+const LoadingAnimado = ({ message = "Cargando...", tip = "" }: LoadingAnimadoProps) => {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const rotationAnim = useRef(new Animated.Value(0)).current;
 
@@ -50,7 +55,7 @@ const LoadingAnimado = () => {
       <Animated.View style={{ transform: [{ rotate: rotateInterpolate }] }}>
         <MaterialIcons name="hourglass-empty" size={64} color="#4dabf7" />
       </Animated.View>
-      <Text style={styles.text}>Inicializando aplicación...</Text>
+      <Text style={styles.text}>{message}</Text>
 
       <View style={styles.progressBar}>
         <Animated.View
@@ -61,7 +66,7 @@ const LoadingAnimado = () => {
         />
       </View>
       <Text style={styles.loadingTip}>
-        💡 Consejo: ¡Ten tu código listo para agilizar el ingreso!
+        <MaterialIcons name="info" size={16} color="#748ffc" /> {tip}
       </Text>
     </View>
   );
