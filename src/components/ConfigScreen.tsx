@@ -1,5 +1,5 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import NetInfo from '@react-native-community/netinfo';
+import NetInfo from "@react-native-community/netinfo";
 import * as Updates from "expo-updates";
 import React, { useEffect, useState } from "react";
 import {
@@ -12,7 +12,6 @@ import {
   View,
 } from "react-native";
 import { getApiUrl, updateApiInstance } from "../services/api";
-
 
 const DEFAULT_API_URL =
   "https://tickets-api-production-bb7a.up.railway.app/api";
@@ -157,7 +156,7 @@ const ConfigScreen = ({ navigation }: { navigation: any }) => {
         >
           <MaterialIcons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
-        <Text style={styles.title}>Configuración de la API</Text>
+        <Text style={styles.title}>Configuraciónes</Text>
         <View style={styles.headerRight} />
       </View>
 

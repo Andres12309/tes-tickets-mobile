@@ -74,6 +74,7 @@ export default function TabLayout() {
           name="config"
           options={{
             headerShown: false,
+            tabBarLabel: "Ajustes",
             tabBarIcon: ({ color }) => (
               <Icon name="cog" size={24} color={color} />
             ),
