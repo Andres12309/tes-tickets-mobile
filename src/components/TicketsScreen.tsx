@@ -1,9 +1,9 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
+  FlatList,
   Platform,
   StyleSheet,
   Text,
@@ -11,12 +11,22 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import appConfig from "../../app.json";
 import { useAppContext } from "../contexts/AppContext";
+import { ticketDb } from "../services/database";
+import { TicketWithUser } from "../types/database";
+import LoadingAnimado from "./LoadingAnimado";
 import SyncButton from "./SyncButton";
+
+// Get the app version from app.json
+const appVersion = appConfig.expo.version || "1.0.2";
+const appRutineVersion = appConfig.expo.runtimeVersion.policy || "1.0.0";
 
 const TicketsScreen = () => {
   const {
     user,
+    usuariosNomina,
     periodo,
     isOnline,
     loading,
@@ -24,16 +34,19 @@ const TicketsScreen = () => {
     showError,
     showSuccess,
     handleCrearTicket,
-    speak,
-    setShowError,
-    setShowSuccess,
     handleGetPeriodo,
+    handleGetNomina,
     preComidaActual,
-    ticketsCount,
+    isAppInitialized,
+    syncStats,
   } = useAppContext();
 
+  const inputRef = useRef(null);
   const [code, setCode] = useState<string>("");
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
+
+  const [showRecentTickets, setShowRecentTickets] = useState(false);
+  const [recentTickets, setRecentTickets] = useState<TicketWithUser[]>([]);
 
   // Efecto para manejar el enfoque de la pantalla
   useFocusEffect(
@@ -42,7 +55,7 @@ const TicketsScreen = () => {
       setCode("");
 
       // Recargar el período actual
-      handleGetPeriodo();
+      // handleGetPeriodo();
 
       // Establecer como inicializado después del primer render
       if (!isInitialized) {
@@ -64,6 +77,20 @@ const TicketsScreen = () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   }, [showSuccess]);
+
+  const loadRecentTickets = async () => {
+    try {
+      const tickets = await ticketDb.getRecentTickets(10);
+      setRecentTickets(tickets as TicketWithUser[]);
+    } catch (error) {
+      // console.log("Error al cargar tickets recientes:", error);
+      setRecentTickets([]);
+    }
+  };
+
+  useEffect(() => {
+    loadRecentTickets();
+  }, [code, showSuccess]);
 
   // Función para manejar la entrada de teclado numérico
   const handleKeyPress = (value: string) => {
@@ -89,8 +116,7 @@ const TicketsScreen = () => {
       ["4", "5", "6"],
       ["7", "8", "9"],
       ["delete", "0", "enter"],
-      ["V", "P", "E"],
-      ["G", "X"],
+      ["V", "P", "E", "G"], // Letras en una sola fila
     ];
 
     return (
@@ -100,47 +126,43 @@ const TicketsScreen = () => {
             {row.map((key) => {
               let displayText = key;
               let onPress = () => handleKeyPress(key);
-              let style = styles.key;
-              let textStyle = styles.keyText;
+              // Crear un nuevo objeto de estilo para evitar mutaciones directas
+              const buttonStyle = { ...styles.key };
+              const buttonTextStyle = { ...styles.keyText };
 
               if (key === "delete") {
                 displayText = "⌫";
-                style = { ...style, backgroundColor: "#ff6b6b" };
-                textStyle = { ...textStyle, fontSize: 24 };
+                Object.assign(buttonStyle, { backgroundColor: "#ff6b6b" });
+                Object.assign(buttonTextStyle, { fontSize: 24 });
               } else if (key === "enter") {
                 displayText = "✓";
-                style = {
-                  ...style,
-                  backgroundColor: code.length > 0 ? "#51cf66" : "#868e96",
-                };
-                textStyle = { ...textStyle, fontSize: 28, color: "white" };
+                const enterBgColor = code.length > 0 ? "#51cf66" : "#868e96";
+                Object.assign(buttonStyle, { backgroundColor: enterBgColor });
+                Object.assign(buttonTextStyle, {
+                  fontSize: 28,
+                  color: "white",
+                });
                 onPress =
                   code.length > 0 ? () => handleKeyPress("enter") : () => {};
               } else if (key === "V") {
                 displayText = "V";
-                style = {
-                  ...style,
-                  backgroundColor: "#4dabf7",
-                };
+                Object.assign(buttonStyle, { backgroundColor: "#4dabf7" });
               } else if (key === "P") {
                 displayText = "P";
-                style = { ...style, backgroundColor: "#f59e0b" };
+                Object.assign(buttonStyle, { backgroundColor: "#f59e0b" });
               } else if (key === "E") {
                 displayText = "E";
-                style = { ...style, backgroundColor: "#10b981" };
+                Object.assign(buttonStyle, { backgroundColor: "#10b981" });
               } else if (key === "G") {
                 displayText = "G";
-                style = { ...style, backgroundColor: "#8b5cf6" };
-              } else if (key === "X") {
-                displayText = "X";
-                style = { ...style, backgroundColor: "#dc2626" };
+                Object.assign(buttonStyle, { backgroundColor: "#8b5cf6" });
               }
 
               return (
                 <TouchableOpacity
                   key={key}
                   style={[
-                    style,
+                    buttonStyle,
                     key === "enter"
                       ? { opacity: code.length > 0 ? 1 : 0.6 }
                       : null,
@@ -148,7 +170,7 @@ const TicketsScreen = () => {
                   onPress={onPress}
                   disabled={loading && key === "enter"}
                 >
-                  <Text style={textStyle}>{displayText}</Text>
+                  <Text style={buttonTextStyle}>{displayText}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -163,16 +185,31 @@ const TicketsScreen = () => {
     if (!periodo) {
       return (
         <View style={styles.periodoContainer}>
-          <Text style={styles.periodoText}>Cargando período...</Text>
+          <Text style={styles.periodoText}>Sin período! </Text>
         </View>
       );
     }
 
     return (
       <View style={styles.periodoContainer}>
-        <Text style={styles.periodoText}>
-          {preComidaActual?.nombre || "Período actual"}
-        </Text>
+        {preComidaActual?.nombre ? (
+          <Text style={styles.periodoText}>{preComidaActual?.nombre}</Text>
+        ) : (
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: "bold",
+              color: "#dc3545",
+              textAlign: "center",
+              padding: 5,
+              backgroundColor: "#f8d7da",
+              borderRadius: 8,
+              elevation: 5,
+            }}
+          >
+            No es hora de comida
+          </Text>
+        )}
         <Text style={styles.periodoTime}>
           {preComidaActual?.hora_inicio} - {preComidaActual?.hora_fin}
         </Text>
@@ -199,49 +236,149 @@ const TicketsScreen = () => {
     <View style={styles.codeContainer}>
       <TextInput
         style={styles.codeText}
-        value={code || "Ingrese su código"}
+        value={code}
         inputMode="none"
-        editable={false}
-        autoFocus={true}
+        ref={inputRef}
+        autoFocus
         onChangeText={(text) => {
-          if (text.includes(" ")) {
-            const parts = text.split(" ");
-            if (parts.length > 1) {
-              const c = parts[1];
-              handleCrearTicket(c);
+          const partes = text.trim().split(/\s+/);
+          let extractedCode = partes[1];
+
+          if (extractedCode) {
+            if (/^\d+$/.test(extractedCode)) {
+              extractedCode = extractedCode.replace(/^0+/, "");
             }
+
+            handleCrearTicket(extractedCode);
           } else {
-            if (text.length > 0) {
-              handleCrearTicket(text);
-            } else {
-              setCode(text);
-            }
+            setCode(text);
           }
         }}
       />
     </View>
   );
 
-  // Renderizar indicador de carga
+  const toggleRecentTickets = () => {
+    setShowRecentTickets(!showRecentTickets);
+  };
+
+  // Renderizar el listado de tickets recientes
+  const renderRecentTickets = () => (
+    <View style={styles.recentTicketsContainer}>
+      <View style={styles.recentTicketsHeader}>
+        <Text style={styles.recentTicketsTitle}>Recientes</Text>
+        <TouchableOpacity
+          onPress={toggleRecentTickets}
+          style={styles.closeButton}
+        >
+          <MaterialIcons name="close" size={24} color="#6c757d" />
+        </TouchableOpacity>
+      </View>
+      <FlatList
+        data={recentTickets}
+        keyExtractor={(item) => item.uuid4}
+        renderItem={({ item }) => (
+          <View style={styles.recentTicketItem}>
+            <View style={styles.recentTicketIcon}>
+              <MaterialIcons
+                name="confirmation-number"
+                size={20}
+                color="#4dabf7"
+              />
+            </View>
+            <View style={styles.recentTicketInfo}>
+              <Text style={styles.recentTicketCode}>
+                {item.code || "Sin código"}
+              </Text>
+              <Text style={styles.recentTicketName}>
+                {item.nombres || "Usuario"} {item.apellidos || ""}
+              </Text>
+              <Text style={styles.recentTicketTime}>
+                {item.create_at
+                  ? new Date(item.create_at).toLocaleTimeString()
+                  : ""}
+              </Text>
+            </View>
+          </View>
+        )}
+        contentContainerStyle={styles.recentTicketsList}
+      />
+    </View>
+  );
+
+  // Cargando minetras se obtiene la información
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4dabf7" />
-        <Text style={styles.loadingText}>Procesando...</Text>
-      </View>
+      <LoadingAnimado
+        message="Sincronizando..."
+        tip="💡 Consejo: ¡Ten tu código listo para agilizar el ingreso!"
+      />
+    );
+  }
+
+  // Mostrar un loading mientras se inicializa la app
+  if (!isAppInitialized) {
+    return (
+      <LoadingAnimado
+        message="Inicializando aplicación..."
+        tip="💡 Consejo: ¡Ten tu código listo para agilizar el ingreso!"
+      />
     );
   }
 
   return (
     <View style={styles.container}>
+      <Text style={styles.versionText}>v{appVersion}</Text>
       {/* Encabezado */}
       <View style={styles.header}>
-        <Text style={styles.title}>Tickets</Text>
-        {renderConnectionStatus()}
+        <View style={styles.titleWithCounter}>
+          <Text style={styles.title}>Tickets</Text>
+          <View style={styles.ticketCounter}>
+            <Text style={styles.ticketCounterText}>{syncStats.total}</Text>
+          </View>
+        </View>
+        <View style={styles.syncGroup}>
+          <TouchableOpacity
+            onPress={toggleRecentTickets}
+            style={styles.showRecentButton}
+          >
+            <MaterialIcons name="history" size={24} color="#4dabf7" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.syncButton, loading && styles.syncButtonDisabled]}
+            onPress={() => handleGetPeriodo(false)}
+            disabled={loading}
+          >
+            <Text style={styles.statusText}>
+              <Icon name="sync" size={15} color="#fff" />
+              Periodo
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.syncButton, loading && styles.syncButtonDisabled]}
+            onPress={() => handleGetNomina(false)}
+            disabled={loading}
+          >
+            <Text style={styles.statusText}>
+              <Icon name="sync" size={15} color="#fff" />
+              Nómina {usuariosNomina.length}
+            </Text>
+          </TouchableOpacity>
+          {renderConnectionStatus()}
+        </View>
       </View>
 
       <View
-        style={{ display: "flex", flexDirection: "row", alignItems: "center" }}
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          alignContent: "space-between",
+          padding: 2,
+          marginBottom: 10,
+          width: "100%",
+        }}
       >
         {/* Información del período */}
         {renderPeriodoInfo()}
@@ -250,12 +387,14 @@ const TicketsScreen = () => {
 
       {/* Contador de tickets */}
       {/* {renderTicketsCount()} */}
+      <View style={styles.centeredContent}>
+        {/* Código ingresado */}
+        {renderCodeInput()}
 
-      {/* Código ingresado */}
-      {renderCodeInput()}
-
-      {/* Teclado numérico */}
-      {renderNumericKeypad()}
+        {/* Teclado numérico */}
+        {showRecentTickets && renderRecentTickets()}
+        {!showRecentTickets && renderNumericKeypad()}
+      </View>
 
       {/* Mensaje de éxito */}
       {showSuccess && user ? (
@@ -279,9 +418,9 @@ const TicketsScreen = () => {
       {errorMessage && errorMessage.length > 0 && showError && (
         <View style={styles.successContainer}>
           <MaterialIcons name="error" size={64} color="#F44336" />
-          <Text style={styles.errorText}>Error al registrar el ticket</Text>
+          <Text style={styles.errorText}>{errorMessage}</Text>
           <Text style={styles.userText}>
-            {user ? `${user.nombres} ${user.apellidos}` : "Usuario desconocido"}
+            {user ? `${user.nombres} ${user.apellidos}` : errorMessage[1]}
           </Text>
         </View>
       )}
@@ -293,18 +432,51 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
-    padding: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    width: "100%",
+    height: "100%",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 15,
+    marginTop: 5,
+    width: "100%",
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
     color: "#212529",
+  },
+  titleWithCounter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  ticketCounter: {
+    backgroundColor: "#ff6b6b",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    minWidth: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+
+  ticketCounterText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 14,
   },
   statusContainer: {
     paddingVertical: 6,
@@ -318,7 +490,6 @@ const styles = StyleSheet.create({
   },
   periodoContainer: {
     alignItems: "center",
-    marginBottom: 24,
   },
   periodoText: {
     fontSize: 20,
@@ -330,21 +501,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#495057",
   },
-  counterContainer: {
-    alignItems: "center",
-    marginBottom: 32,
-  },
-  counterText: {
-    fontSize: 18,
-    color: "#495057",
-  },
   codeContainer: {
     height: 80,
+    width: "100%",
     backgroundColor: "white",
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 12,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -364,35 +528,49 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   keypadContainer: {
+    marginTop: 10,
+    display: "flex",
+    justifyContent: "center",
+    alignSelf: "center",
+    width: "100%",
+  },
+  centeredContent: {
+    width: "100%",
+    maxWidth: 400,
     marginTop: "auto",
-    marginBottom: 32,
+    alignItems: "center",
+    justifyContent: "center",
   },
   keypadRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
+    justifyContent: "center",
+    marginBottom: 10,
+    flexWrap: "wrap",
   },
   key: {
+    flex: 1,
     width: "30%",
+    margin: 5,
     aspectRatio: 1.5,
-    backgroundColor: "white",
-    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
+    borderRadius: 10,
+    backgroundColor: "#e9ecef",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
       },
       android: {
-        elevation: 2,
+        elevation: 3,
       },
     }),
   },
   keyText: {
-    fontSize: 28,
+    fontSize: 22,
+    fontWeight: "600",
     color: "#212529",
   },
   loadingContainer: {
@@ -433,6 +611,90 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: "#495057",
     marginTop: 8,
+  },
+  syncGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 2,
+  },
+  syncButton: {
+    backgroundColor: "grey",
+    maxWidth: 120,
+    height: 30,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 2,
+  },
+  syncButtonDisabled: {
+    backgroundColor: "#90CAF9",
+  },
+  // Recent tickets styles
+  recentTicketsContainer: {
+    marginTop: 10,
+    display: "flex",
+    justifyContent: "center",
+    alignSelf: "center",
+    width: "100%",
+    height: 450,
+  },
+  recentTicketsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  recentTicketsTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#495057",
+  },
+  closeButton: {
+    padding: 5,
+  },
+  recentTicketsList: {
+    padding: 10,
+  },
+  recentTicketItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e9ecef",
+  },
+  recentTicketIcon: {
+    marginRight: 10,
+  },
+  recentTicketInfo: {
+    flex: 1,
+  },
+  recentTicketCode: {
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  recentTicketName: {
+    fontSize: 14,
+    color: "#6c757d",
+  },
+  recentTicketTime: {
+    fontSize: 12,
+    color: "#adb5bd",
+  },
+  showRecentButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 8,
+    backgroundColor: "#f1f3f5",
+    borderRadius: 20,
+    marginLeft: 10,
+  },
+  versionText: {
+    position: "absolute",
+    top: 5,
+    right: 10,
+    color: "#666",
+    fontSize: 12,
   },
 });
 
