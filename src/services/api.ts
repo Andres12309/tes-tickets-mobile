@@ -2,7 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 
 const CONFIG_KEY = "@app_config";
-const DEFAULT_API_URL = "https://tickets-api-production-bb7a.up.railway.app/api";
+// const DEFAULT_API_URL = "https://tickets-api-production-bb7a.up.railway.app/api";
+const DEFAULT_API_URL = "https://prd-api-sgdinner.vercel.app/api";
 
 // Función para obtener la URL de la API
 export const getApiUrl = async (): Promise<string> => {
